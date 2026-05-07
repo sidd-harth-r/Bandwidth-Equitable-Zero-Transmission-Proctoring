@@ -1,0 +1,30 @@
+[project]
+name = "bezp-server"
+version = "0.1.0"
+description = "FastAPI backend and federated learning coordinator for BEZP."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "pydantic",
+  "pydantic-settings",
+  "sqlalchemy",
+  "alembic",
+  "psycopg[binary]",
+  "redis",
+  "flwr",
+  "numpy",
+  "scipy",
+  "python-multipart"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-asyncio",
+  "httpx"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

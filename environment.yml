@@ -1,0 +1,23 @@
+name: proctor
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - nodejs=20
+  - pip
+  - pip:
+      - fastapi
+      - uvicorn[standard]
+      - pydantic
+      - pydantic-settings
+      - sqlalchemy
+      - alembic
+      - psycopg[binary]
+      - redis
+      - flwr
+      - numpy
+      - scipy
+      - pytest
+      - pytest-asyncio
+      - httpx
+      - python-multipart

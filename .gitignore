@@ -1,0 +1,38 @@
+# Local environments
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+env/
+proctor/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# Node
+node_modules/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Generated local artifacts
+.codex_tmp/
+logs/
+tmp/
+artifacts/
+*.pcap
+*.pcapng
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
