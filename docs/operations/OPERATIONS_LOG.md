@@ -55,10 +55,10 @@ This document records what changed, why it changed, and how it was performed. Co
 
 ### Operation 8: Git Push
 
-- What changed: pending until after file verification.
+- What changed: staged, committed, and pushed the documentation/scaffold changes to GitHub.
 - Why: user requested that all changes made in this environment be pushed to GitHub.
-- How: stage, commit, and push to the configured `origin` remote after verification.
-- Result: to be completed after documentation files are verified.
+- How: ran `git add`, committed with message `docs: scaffold BEZP implementation plan`, and pushed `main` to the configured `origin` remote.
+- Result: commit `9bf2942` was pushed to `origin/main`.
 
 ### Operation 9: Temporary Artifact Cleanup
 
@@ -73,3 +73,10 @@ This document records what changed, why it changed, and how it was performed. Co
 - Why: confirm the scaffold is syntactically sane before committing.
 - How: listed tracked candidate files, checked Git status, parsed `client/package.json`, parsed `server/pyproject.toml`, ran `git diff --check`, and scanned repository text for non-ASCII characters.
 - Result: JSON and TOML parsed successfully; whitespace check passed; non-ASCII scan returned no matches.
+
+### Operation 11: Operations Log Correction
+
+- What changed: updated Operation 8 after the GitHub push succeeded.
+- Why: keep the operations log aligned with the actual repository state.
+- How: edited this log entry with the pushed commit and remote branch result.
+- Result: this correction is prepared as a follow-up commit and push.
