@@ -2,35 +2,36 @@
 
 ## 2026-05-08
 
-Foundation documentation and repository structure have been created. Phase 1 implementation has started with a backend anomaly-score API and a Vite/TypeScript client score slice.
+Foundation documentation and repository structure have been created. Phase 1 implementation has started with a backend anomaly-score API, PostgreSQL persistence, and a Vite/TypeScript client score slice.
 
 ## Working
 
 - Git repository with GitHub remote.
 - Documentation map.
 - Planned directory structure.
-- `proctor` environment definition.
-- Local `proctor` Python virtual environment for Phase 1.
+- Verified Conda environment named `proctor`.
+- Docker Compose PostgreSQL/TimescaleDB and Redis development services.
 - Client dependencies installed through `npm.cmd install`.
 - FastAPI health endpoint and anomaly-score ingestion endpoint.
+- PostgreSQL-backed anomaly event persistence through SQLAlchemy.
 - Client fusion engine, tier classifier, placeholder pose/gaze worker, IndexedDB store, and HTTP score sender.
-- Backend and client tests passing.
+- Backend and client tests, client build, pip integrity check, and npm audit passing.
 
 ## In Progress
 
 - Replace placeholder pose/gaze worker with MediaPipe Pose.
 - Replace HTTP score fallback with WebRTC DataChannel path.
-- Add PostgreSQL/Redis once Docker or a standard Python environment is available.
+- Add Alembic migrations for the database schema.
+- Add Redis-backed session state and rate limiting.
 
 ## Blocked
 
 - PDF source extraction was not reliable with local tools.
-- Docker and Conda are not installed on this machine.
-- Native Python database/ML dependencies could not be installed with the current MSYS Python compiler setup.
-- Native Python database/ML dependencies are still pending a standard Conda/CPython or Docker setup.
+- Real webcam/browser validation must be performed outside this terminal environment.
+- Wireshark packet captures and network shaping require local/manual machine access.
 
 ## Next
 
 - Wire MediaPipe Pose into `PoseGazeWorker`.
 - Add WebRTC signaling and unreliable DataChannel score transport.
-- Add PostgreSQL-backed anomaly event persistence.
+- Add Alembic migrations and Redis-backed live session state.

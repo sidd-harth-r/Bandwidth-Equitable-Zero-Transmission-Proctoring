@@ -4,23 +4,22 @@
 
 Use the environment name `proctor` for all local project work.
 
-```bash
+```powershell
 conda env create -f environment.yml
 conda activate proctor
 ```
 
-In this workspace, Conda is not currently installed, so a local Python virtual environment named `proctor` was created instead:
+On this Windows machine, `conda` is not currently on `PATH`. Use the installed executable directly when automation or shell sessions cannot find Conda:
 
 ```powershell
-python -m venv proctor
-.\proctor\bin\python.exe -m pip install -e "server[dev]"
+& 'C:\Users\siddh\anaconda3\Scripts\conda.exe' run -n proctor python --version
 ```
 
-This machine uses MSYS Python, so Phase 1 pins FastAPI to the Pydantic v1 line. Native database and ML packages are kept as optional dependency groups until Conda/Docker or standard CPython is available.
+The `proctor` Conda environment has been created and verified. It includes Python 3.11, Node.js 20, FastAPI, Pydantic v2, SQLAlchemy, Alembic, psycopg, Redis client libraries, Flower, NumPy, SciPy, pytest, and HTTPX.
 
 If the environment already exists:
 
-```bash
+```powershell
 conda env update -n proctor -f environment.yml
 conda activate proctor
 ```
@@ -38,12 +37,18 @@ Install these outside this repository:
 
 ## 3. Python Backend Setup
 
-The Python dependencies are defined in [../../environment.yml](../../environment.yml). Phase 1 backend work should later add pinned project dependencies in `server/pyproject.toml`.
+The Python dependencies are defined in [../../environment.yml](../../environment.yml) and mirrored in [../../server/pyproject.toml](../../server/pyproject.toml).
+
+Install or refresh the editable backend package:
+
+```powershell
+& 'C:\Users\siddh\anaconda3\Scripts\conda.exe' run -n proctor python -m pip install -e "server[dev]"
+```
 
 Current Phase 1 backend runtime:
 
 ```powershell
-.\proctor\bin\python.exe -m uvicorn bezp_server.main:app --app-dir server/src --reload
+& 'C:\Users\siddh\anaconda3\Scripts\conda.exe' run -n proctor python -m uvicorn bezp_server.main:app --app-dir server/src --reload
 ```
 
 API health check:
@@ -89,10 +94,10 @@ Expected local dashboard port: `5174`.
 
 ## 6. Local Services
 
-After backend code is added, use:
+Start PostgreSQL/TimescaleDB and Redis:
 
-```bash
-docker compose -f infrastructure/docker/docker-compose.dev.yml up
+```powershell
+docker compose -f infrastructure/docker/docker-compose.dev.yml up -d
 ```
 
 Required development services:
@@ -102,7 +107,24 @@ Required development services:
 - FastAPI backend.
 - Optional local Nginx reverse proxy.
 
-Docker is not installed on the current machine. Install Docker Desktop outside this environment before running PostgreSQL/Redis through Compose.
+Verified local service versions on 2026-05-08:
+
+- Docker Engine `29.4.2`.
+- Docker Compose `v5.1.3`.
+- TimescaleDB extension `2.26.4` on PostgreSQL `15.17`.
+- Redis Stack Server available on port `6379`.
+
+Database connectivity check:
+
+```powershell
+& 'C:\Users\siddh\anaconda3\Scripts\conda.exe' run -n proctor python -c "import psycopg; conn = psycopg.connect('postgresql://bezp:bezp_dev_password@localhost:5432/bezp'); print(conn.execute('select version()').fetchone()[0]); conn.close()"
+```
+
+Redis connectivity check:
+
+```powershell
+& 'C:\Users\siddh\anaconda3\Scripts\conda.exe' run -n proctor python -c "import redis; print(redis.Redis(host='localhost', port=6379).ping())"
+```
 
 ## 7. Environment Variables
 

@@ -10,7 +10,7 @@ class InMemoryAnomalyStore:
         self._lock = Lock()
 
     def add(self, payload: AnomalyScoreIn) -> AnomalyScoreOut:
-        event = AnomalyScoreOut(**payload.dict())
+        event = AnomalyScoreOut(**payload.model_dump())
         with self._lock:
             self._events[event.session_id].append(event)
         return event

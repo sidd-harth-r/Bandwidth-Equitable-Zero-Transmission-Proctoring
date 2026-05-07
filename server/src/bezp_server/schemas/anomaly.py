@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Dict
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class Gear(str, Enum):
@@ -37,7 +37,8 @@ class AnomalyScoreIn(BaseModel):
     gear: Gear
     metadata: Dict[str, str] = Field(default_factory=dict)
 
-    @validator("occurred_at")
+    @field_validator("occurred_at")
+    @classmethod
     def require_timezone(cls, value: datetime) -> datetime:
         if value.tzinfo is None:
             return value.replace(tzinfo=timezone.utc)

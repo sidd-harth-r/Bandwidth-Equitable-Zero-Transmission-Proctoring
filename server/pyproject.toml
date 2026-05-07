@@ -4,10 +4,17 @@ version = "0.1.0"
 description = "FastAPI backend and federated learning coordinator for BEZP."
 requires-python = ">=3.11"
 dependencies = [
-  "fastapi==0.99.1",
-  "uvicorn",
-  "pydantic==1.10.24",
+  "fastapi",
+  "uvicorn[standard]",
+  "pydantic",
+  "pydantic-settings",
   "redis",
+  "sqlalchemy",
+  "alembic",
+  "psycopg[binary]",
+  "flwr",
+  "numpy",
+  "scipy",
   "python-multipart"
 ]
 
@@ -15,17 +22,7 @@ dependencies = [
 dev = [
   "pytest",
   "pytest-asyncio",
-  "httpx==0.24.1"
-]
-database = [
-  "sqlalchemy",
-  "alembic",
-  "psycopg[binary]"
-]
-ml = [
-  "flwr",
-  "numpy",
-  "scipy"
+  "httpx"
 ]
 
 [tool.pytest.ini_options]

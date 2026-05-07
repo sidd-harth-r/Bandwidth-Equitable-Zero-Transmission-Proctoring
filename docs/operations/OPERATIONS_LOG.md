@@ -131,3 +131,54 @@ This document records what changed, why it changed, and how it was performed. Co
 - Why: verify the implementation slice works before committing.
 - How: ran backend pytest, client Vitest, client production build, `pip check`, dependency version checks, and npm audit.
 - Result: backend tests passed; client tests passed; client build passed; `pip check` passed; npm audit passed after the dev dependency upgrade.
+
+## 2026-05-08: Conda And Docker Dependency Completion
+
+### Operation 19: Docker Verification
+
+- What changed: no repository content changed.
+- Why: confirm Docker is usable before enabling database-backed implementation.
+- How: checked Docker Engine, Docker Compose, daemon connectivity, and running Compose service status.
+- Result: Docker Engine `29.4.2` and Docker Compose `v5.1.3` are available.
+
+### Operation 20: Conda Environment Creation
+
+- What changed: created the local Conda environment named `proctor` outside the repository.
+- Why: the earlier MSYS Python fallback could not support the native database, ML, and FL dependency stack.
+- How: used the installed Conda executable at `C:\Users\siddh\anaconda3\Scripts\conda.exe` to create the environment from `environment.yml`.
+- Result: `proctor` now contains Python 3.11, Node.js 20, FastAPI, Pydantic v2, SQLAlchemy, Alembic, psycopg, Redis, Flower, NumPy, SciPy, pytest, and HTTPX.
+
+### Operation 21: Backend Dependency Alignment
+
+- What changed: updated `server/pyproject.toml`, server settings, and Pydantic validators for the full Conda-backed dependency set.
+- Why: restore the intended backend dependency stack now that Conda is available.
+- How: added full runtime dependencies, switched settings to `pydantic-settings`, replaced deprecated Pydantic v1 validation calls, and installed `server[dev]` editable into `proctor`.
+- Result: `conda run -n proctor python -m pip check` reports no broken requirements.
+
+### Operation 22: Development Services Startup
+
+- What changed: started Docker Compose PostgreSQL/TimescaleDB and Redis containers.
+- Why: database-backed anomaly-score persistence requires local services.
+- How: ran `docker compose -f infrastructure/docker/docker-compose.dev.yml up -d`, verified the containers, checked PostgreSQL and Redis connections from the `proctor` environment, and enabled the TimescaleDB extension.
+- Result: PostgreSQL `15.17`, TimescaleDB extension `2.26.4`, and Redis are reachable from the backend environment.
+
+### Operation 23: PostgreSQL Anomaly Persistence
+
+- What changed: added SQLAlchemy model/session modules, dependency-injected database sessions, a SQL-backed anomaly store, and route/test updates.
+- Why: move anomaly-score events from process-local memory into durable PostgreSQL storage.
+- How: created `AnomalyEvent`, `Database`, `SqlAnomalyStore`, and API dependency modules; updated app startup to initialize the database through FastAPI lifespan; updated anomaly-score tests to run against the database.
+- Result: anomaly-score ingestion and per-session summaries now persist and read events from PostgreSQL.
+
+### Operation 24: Verification After Persistence
+
+- What changed: no repository content changed after the final validation commands.
+- Why: verify setup and implementation before documenting, committing, and pushing.
+- How: ran backend pytest in `proctor`, client Vitest, client production build, `pip check`, and npm audit.
+- Result: backend tests passed, client tests passed, client build passed, `pip check` passed, and npm audit reported 0 vulnerabilities.
+
+### Operation 25: Documentation Refresh
+
+- What changed: updated setup notes, changelog, server README, current status, completed tasks, blockers, and this operations log.
+- Why: keep the implementation documentation aligned with the verified Conda/Docker setup and database-backed backend behavior.
+- How: edited project documentation after all dependency and implementation checks passed.
+- Result: the next phases can start from the current, verified environment state.

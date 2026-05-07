@@ -9,23 +9,29 @@ All notable project changes are recorded here. Every future implementation PR sh
 - Started Phase 1 implementation with a FastAPI backend package, health endpoint, anomaly-score ingestion endpoint, in-memory score store, and backend tests.
 - Added a Vite/TypeScript client shell with a pose/gaze placeholder Web Worker, fusion engine, tier classifier, IndexedDB session store, anomaly-score API client, and client tests.
 - Added generated `client/package-lock.json` after installing client dependencies.
+- Created and verified the real Conda environment named `proctor`.
+- Started Docker Compose PostgreSQL/TimescaleDB and Redis development services.
+- Added SQLAlchemy database wiring and PostgreSQL persistence for anomaly-score events.
 
 ### Changed
 
-- Pinned Phase 1 backend dependencies to versions compatible with the local MSYS Python environment.
-- Moved native database and ML dependencies into optional backend dependency groups for later installation on a standard Conda/CPython setup.
+- Replaced the temporary MSYS Python fallback dependency plan with the Conda-backed Pydantic v2, SQLAlchemy, Redis, Flower, NumPy, and SciPy setup.
+- Replaced the backend anomaly-score route's process-local in-memory store with a request-scoped SQLAlchemy store.
+- Updated FastAPI startup initialization to use a lifespan handler.
 
 ### Verified
 
-- `server`: `python -m pytest` passed.
-- `client`: `npm test` passed.
-- `client`: `npm run build` passed.
-- `proctor`: `pip check` passed.
+- Docker Engine `29.4.2`, Docker Compose `v5.1.3`, PostgreSQL `15.17`, TimescaleDB extension `2.26.4`, and Redis connectivity were verified.
+- `server`: `conda run -n proctor python -m pytest` passed.
+- `client`: `npm.cmd test` passed.
+- `client`: `npm.cmd run build` passed.
+- `proctor`: `conda run -n proctor python -m pip check` passed.
+- `client`: `npm.cmd audit --audit-level=moderate` reported 0 vulnerabilities.
 
 ### Dependency Notes
 
-- Upgraded Vite/Vitest/TypeScript dev dependencies after initial audit findings; `npm audit --audit-level=moderate` now reports 0 vulnerabilities.
-- SQLAlchemy/Alembic/NumPy/SciPy/Flower were not installed in this local MSYS Python environment because native extension builds failed. They remain documented for the Conda/Docker phase.
+- Use `C:\Users\siddh\anaconda3\Scripts\conda.exe` directly in shells where Conda is not on `PATH`.
+- The repository still ignores the earlier local fallback `proctor` virtual environment; implementation should use the verified Conda environment.
 
 ## 2026-05-08 Foundation
 
