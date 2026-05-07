@@ -13,3 +13,14 @@ Planned responsibilities:
 - Service Worker offline queue and model cache.
 
 Do not transmit raw continuous video from this application.
+
+## Phase 1 Status
+
+The current client contains a Vite/TypeScript shell with a pose/gaze placeholder worker. It produces derived numerical scores only, stores them in IndexedDB, and posts them to the Phase 1 backend fallback endpoint.
+
+Run locally:
+
+```bash
+npm install
+npm run dev
+```

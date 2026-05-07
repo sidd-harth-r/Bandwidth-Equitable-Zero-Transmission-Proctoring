@@ -1,0 +1,2 @@
+"""BEZP FastAPI backend package."""
+

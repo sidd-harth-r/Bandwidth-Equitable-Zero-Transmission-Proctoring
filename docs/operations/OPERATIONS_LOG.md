@@ -80,3 +80,54 @@ This document records what changed, why it changed, and how it was performed. Co
 - Why: keep the operations log aligned with the actual repository state.
 - How: edited this log entry with the pushed commit and remote branch result.
 - Result: this correction is prepared as a follow-up commit and push.
+
+## 2026-05-08: Phase 1 Implementation Start
+
+### Operation 12: Dependency Check
+
+- What changed: no repository content changed.
+- Why: identify what could be installed and run locally before implementation.
+- How: checked Git status, Python, Node, npm, Docker, Conda, and Python package imports.
+- Result: Git was clean; Python and Node were available; npm required `npm.cmd`; Docker and Conda were missing; backend Python packages were not installed.
+
+### Operation 13: Dependency Installation
+
+- What changed: created local ignored `proctor` virtual environment, installed client dependencies, generated `client/package-lock.json`, and installed Phase 1 backend dependencies.
+- Why: user requested dependency checks and installation before implementation.
+- How: used `npm.cmd install` in `client`; bootstrapped pip from Python's bundled wheel because `ensurepip` hit temp-directory permission errors; installed `server[dev]` with Phase 1-compatible dependency pins.
+- Result: client dependencies installed; backend editable package installed; `pip check` passed after dependency pins were updated.
+
+### Operation 14: Dependency Constraints Found
+
+- What changed: updated backend dependency groups to separate Phase 1 runtime from later database/ML dependencies.
+- Why: the local MSYS Python environment could not build native packages required by SQLAlchemy greenlet, NumPy, SciPy, or Flower.
+- How: pinned FastAPI/Pydantic/httpx to compatible Phase 1 versions and moved database/ML packages into optional `database` and `ml` extras.
+- Result: Phase 1 backend tests can run locally; database and FL installation remain for a Conda/Docker/standard CPython setup.
+
+### Operation 15: Backend Phase 1 Slice
+
+- What changed: added `bezp_server` FastAPI package with app factory, CORS, health endpoint, anomaly-score ingestion route, Pydantic schemas, in-memory anomaly store, and tests.
+- Why: establish the first server-side path for derived anomaly scores before adding PostgreSQL and WebRTC.
+- How: implemented route modules under `server/src/bezp_server` and pytest coverage under `server/tests`.
+- Result: backend accepts score payloads, validates score ranges, and returns per-session summaries.
+
+### Operation 16: Client Phase 1 Slice
+
+- What changed: added Vite/TypeScript client app, fusion engine, tier classifier, shared score types, IndexedDB session store, anomaly-score HTTP client, pose/gaze placeholder worker, styles, and Vitest coverage.
+- Why: start the browser side of the first end-to-end anomaly-score flow while MediaPipe/WebRTC are still pending.
+- How: implemented a simple UI that starts a worker, creates derived pose/gaze placeholder scores, stores them locally, classifies tier, and posts to the backend fallback endpoint.
+- Result: client tests pass and production build succeeds.
+
+### Operation 17: Dependency Audit Fix
+
+- What changed: upgraded Vite, Vitest, and TypeScript dev dependencies and added Vite client type references.
+- Why: initial `npm audit --audit-level=moderate` reported 5 moderate findings through Vite/esbuild/Vitest transitive dependencies.
+- How: upgraded dev dependencies with npm, switched Vite config typing to `vitest/config`, and added `vite-env.d.ts` for CSS module side-effect imports.
+- Result: `npm audit --audit-level=moderate` reports 0 vulnerabilities.
+
+### Operation 18: Validation
+
+- What changed: no project content changed after the final validation commands.
+- Why: verify the implementation slice works before committing.
+- How: ran backend pytest, client Vitest, client production build, `pip check`, dependency version checks, and npm audit.
+- Result: backend tests passed; client tests passed; client build passed; `pip check` passed; npm audit passed after the dev dependency upgrade.

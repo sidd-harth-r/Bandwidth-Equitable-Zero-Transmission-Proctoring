@@ -6,6 +6,31 @@ All notable project changes are recorded here. Every future implementation PR sh
 
 ### Added
 
+- Started Phase 1 implementation with a FastAPI backend package, health endpoint, anomaly-score ingestion endpoint, in-memory score store, and backend tests.
+- Added a Vite/TypeScript client shell with a pose/gaze placeholder Web Worker, fusion engine, tier classifier, IndexedDB session store, anomaly-score API client, and client tests.
+- Added generated `client/package-lock.json` after installing client dependencies.
+
+### Changed
+
+- Pinned Phase 1 backend dependencies to versions compatible with the local MSYS Python environment.
+- Moved native database and ML dependencies into optional backend dependency groups for later installation on a standard Conda/CPython setup.
+
+### Verified
+
+- `server`: `python -m pytest` passed.
+- `client`: `npm test` passed.
+- `client`: `npm run build` passed.
+- `proctor`: `pip check` passed.
+
+### Dependency Notes
+
+- Upgraded Vite/Vitest/TypeScript dev dependencies after initial audit findings; `npm audit --audit-level=moderate` now reports 0 vulnerabilities.
+- SQLAlchemy/Alembic/NumPy/SciPy/Flower were not installed in this local MSYS Python environment because native extension builds failed. They remain documented for the Conda/Docker phase.
+
+## 2026-05-08 Foundation
+
+### Added
+
 - Created the BEZP implementation documentation set from the uploaded technical specification, synopsis, and presentation.
 - Added the planned repository structure for client, server, proctor dashboard, ML, infrastructure, tests, and progress tracking.
 - Added `environment.yml` using the required Conda environment name `proctor`.

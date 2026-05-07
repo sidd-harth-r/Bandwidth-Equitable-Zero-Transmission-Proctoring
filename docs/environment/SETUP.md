@@ -9,6 +9,15 @@ conda env create -f environment.yml
 conda activate proctor
 ```
 
+In this workspace, Conda is not currently installed, so a local Python virtual environment named `proctor` was created instead:
+
+```powershell
+python -m venv proctor
+.\proctor\bin\python.exe -m pip install -e "server[dev]"
+```
+
+This machine uses MSYS Python, so Phase 1 pins FastAPI to the Pydantic v1 line. Native database and ML packages are kept as optional dependency groups until Conda/Docker or standard CPython is available.
+
 If the environment already exists:
 
 ```bash
@@ -31,6 +40,18 @@ Install these outside this repository:
 
 The Python dependencies are defined in [../../environment.yml](../../environment.yml). Phase 1 backend work should later add pinned project dependencies in `server/pyproject.toml`.
 
+Current Phase 1 backend runtime:
+
+```powershell
+.\proctor\bin\python.exe -m uvicorn bezp_server.main:app --app-dir server/src --reload
+```
+
+API health check:
+
+```text
+http://localhost:8000/api/v1/health
+```
+
 Expected backend services:
 
 - FastAPI app on port `8000`.
@@ -52,6 +73,14 @@ npm run dev
 
 Expected local client port: `5173`.
 
+Current Phase 1 client:
+
+- Vite TypeScript app.
+- Pose/gaze placeholder Web Worker.
+- Local IndexedDB anomaly event storage.
+- HTTP fallback anomaly-score upload to the backend.
+- WebRTC and MediaPipe integration remain next implementation tasks.
+
 ## 5. Proctor Dashboard Setup
 
 The proctor dashboard can share the client frontend toolchain but should remain a separate app because its data access, roles, and UI workflows are different.
@@ -72,6 +101,8 @@ Required development services:
 - Redis 7 with RedisJSON if available.
 - FastAPI backend.
 - Optional local Nginx reverse proxy.
+
+Docker is not installed on the current machine. Install Docker Desktop outside this environment before running PostgreSQL/Redis through Compose.
 
 ## 7. Environment Variables
 
