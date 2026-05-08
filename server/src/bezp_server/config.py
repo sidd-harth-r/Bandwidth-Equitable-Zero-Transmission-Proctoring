@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     postgres_user: str = "bezp"
     postgres_password: str = "bezp_dev_password"
     database_url: str | None = None
+    database_connect_timeout_seconds: int = 5
     redis_host: str = "localhost"
     redis_port: int = 6379
     redis_db: int = 0

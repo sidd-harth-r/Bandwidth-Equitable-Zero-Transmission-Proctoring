@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 from sqlalchemy import delete
+from unittest.mock import patch
 
 from bezp_server.db.models import AnomalyEvent
 from bezp_server.main import create_app
@@ -11,6 +12,17 @@ def test_health_endpoint() -> None:
 
         assert response.status_code == 200
         assert response.json() == {"status": "ok"}
+
+
+def test_startup_runs_alembic_upgrade() -> None:
+    with patch("bezp_server.db.session.command.upgrade") as upgrade, patch(
+        "bezp_server.db.session.command.stamp"
+    ) as stamp:
+        with TestClient(create_app()) as client:
+            response = client.get("/api/v1/health")
+
+        assert response.status_code == 200
+        assert upgrade.called or stamp.called
 
 
 def test_anomaly_score_ingestion_and_summary() -> None:

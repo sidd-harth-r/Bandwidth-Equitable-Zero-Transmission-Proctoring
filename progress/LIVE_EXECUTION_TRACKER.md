@@ -32,13 +32,13 @@ This file is the single live status board for implementation.
 
 ## 2) Doing Now
 
-- Post-Phase-1 backend hardening: Alembic scaffold + Redis session state + ingest rate limiting.
+- Post-Phase-1 backend hardening documentation and push.
 
 ## 3) Remaining
 
 - Move to post-Phase-1 tasks:
-  - Apply Alembic migrations in managed startup path (replace implicit `create_all` flow).
   - Expand rate-limit coverage and per-endpoint policy controls.
+  - Add future Alembic revisions as schema expands.
 
 ## 4) New Evidence Artifact
 

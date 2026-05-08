@@ -3,7 +3,7 @@ from __future__ import annotations
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import create_engine, pool
 
 from bezp_server.config import get_settings
 from bezp_server.db.models import Base
@@ -25,10 +25,10 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
+    connectable = create_engine(
+        settings.resolved_database_url,
         poolclass=pool.NullPool,
+        connect_args={"connect_timeout": settings.database_connect_timeout_seconds},
     )
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)

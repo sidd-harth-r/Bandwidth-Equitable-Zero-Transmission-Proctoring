@@ -357,6 +357,13 @@ This document records what changed, why it changed, and how it was performed. Co
 - How: implemented `RateLimiter` and `SessionStateStore` services; wired dependency injection and route updates in anomaly ingestion and new session state route; added Alembic files under `server/alembic.ini` and `server/src/db/migrations`; added/updated backend tests.
 - Result: anomaly ingestion now enforces a token-window style limit with HTTP 429 on overflow, session state is queryable via `GET /api/v1/sessions/{session_id}/state`, and backend tests pass (`8 passed`).
 
+### Operation 44: Alembic-Managed Startup Migration Flow
+
+- What changed: switched backend startup initialization from SQLAlchemy `Base.metadata.create_all` to Alembic `upgrade head`, added fast database connection timeouts for both SQLAlchemy and Alembic engines, added a legacy-schema compatibility stamp for databases created before Alembic adoption, and cleaned Alembic config warnings.
+- Why: complete the next planned step so schema lifecycle is migration-driven rather than implicit table creation, while keeping existing local development databases usable.
+- How: updated `server/src/bezp_server/db/session.py`, `server/src/db/migrations/env.py`, `server/src/db/migrations/versions/20260508_0001_create_anomaly_events.py`, `server/alembic.ini`, and startup regression tests; restarted local containers when PostgreSQL was found offline during validation.
+- Result: backend startup now runs Alembic-managed migrations, legacy local databases are stamped to baseline instead of failing on duplicate tables, and backend tests pass (`9 passed`).
+
 ## 2026-05-08: Phase 1 Runtime Reliability And Live Datapoints Visibility
 
 ### Operation 34: Live Webcam Datapoints Surface

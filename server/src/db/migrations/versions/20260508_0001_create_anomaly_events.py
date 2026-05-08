@@ -17,7 +17,6 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute("CREATE EXTENSION IF NOT EXISTS timescaledb")
     op.create_table(
         "anomaly_events",
         sa.Column("event_id", sa.String(length=64), nullable=False),
