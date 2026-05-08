@@ -115,6 +115,65 @@ def test_session_state_updates_on_ingest() -> None:
         assert state.json()["student_id"] == "student-state-001"
         assert state.json()["event_count"] == 1
         assert state.json()["last_tier"] == "tier_3"
+        assert state.json()["status"] == "active"
+        assert state.json()["current_gear"] == "gear_1"
+
+
+def test_session_heartbeat_creates_live_state() -> None:
+    app = create_app()
+
+    with TestClient(app) as client:
+        clear_session_state(app, "session-heartbeat-001")
+        clear_rate_key(app, "session:heartbeat", "session-heartbeat-001")
+        response = client.post(
+            "/api/v1/sessions/session-heartbeat-001/heartbeat",
+            json={"student_id": "student-heartbeat-001", "status": "active", "gear": "gear_2"},
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["session_id"] == "session-heartbeat-001"
+        assert body["student_id"] == "student-heartbeat-001"
+        assert body["event_count"] == 0
+        assert body["heartbeat_count"] == 1
+        assert body["status"] == "active"
+        assert body["current_gear"] == "gear_2"
+        assert body["last_heartbeat_at"]
+
+
+def test_session_heartbeat_preserves_latest_anomaly_fields() -> None:
+    app = create_app()
+    payload = {
+        "session_id": "session-heartbeat-merge-001",
+        "student_id": "student-heartbeat-merge-001",
+        "channel_scores": {"pose_gaze": 0.66, "rppg": 0.0, "au": 0.0, "keystroke": 0.0},
+        "agreement_index": 0.0,
+        "weighted_score": 0.66,
+        "tier": "tier_2",
+        "gear": "gear_1",
+        "metadata": {"source": "test"},
+    }
+
+    with TestClient(app) as client:
+        clear_anomaly_events(app)
+        clear_session_state(app, "session-heartbeat-merge-001")
+        clear_rate_key(app, "ingest", "student-heartbeat-merge-001")
+        clear_rate_key(app, "session:heartbeat", "session-heartbeat-merge-001")
+
+        created = client.post("/api/v1/anomaly-scores", json=payload)
+        heartbeat = client.post(
+            "/api/v1/sessions/session-heartbeat-merge-001/heartbeat",
+            json={"student_id": "student-heartbeat-merge-001", "status": "active", "gear": "gear_2"},
+        )
+
+        assert created.status_code == 201
+        assert heartbeat.status_code == 200
+        body = heartbeat.json()
+        assert body["event_count"] == 1
+        assert body["last_tier"] == "tier_2"
+        assert body["last_weighted_score"] == 0.66
+        assert body["current_gear"] == "gear_2"
+        assert body["last_gear"] == "gear_1"
 
 
 def test_ingestion_rate_limit_enforced() -> None:
@@ -234,6 +293,20 @@ def test_session_state_read_rate_limit_enforced() -> None:
         clear_rate_key(app, "session-state:read", "session-rate-read-001")
         set_rate_count(app, "session-state:read", "session-rate-read-001", 240)
         response = client.get("/api/v1/sessions/session-rate-read-001/state")
+
+        assert response.status_code == 429
+
+
+def test_session_heartbeat_rate_limit_enforced() -> None:
+    app = create_app()
+
+    with TestClient(app) as client:
+        clear_rate_key(app, "session:heartbeat", "session-heartbeat-rate-001")
+        set_rate_count(app, "session:heartbeat", "session-heartbeat-rate-001", 180)
+        response = client.post(
+            "/api/v1/sessions/session-heartbeat-rate-001/heartbeat",
+            json={"student_id": "student-heartbeat-rate-001"},
+        )
 
         assert response.status_code == 429
 

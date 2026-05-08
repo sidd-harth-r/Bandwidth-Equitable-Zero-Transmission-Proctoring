@@ -371,6 +371,13 @@ This document records what changed, why it changed, and how it was performed. Co
 - How: added configurable limits in `server/src/bezp_server/config.py`, expanded `RateLimiter` policy methods, wired rate checks into signaling and session-state routes, and added backend tests for each new 429 path.
 - Result: Redis-backed rate limiting now covers anomaly ingestion, signaling enqueue/dequeue, and session-state reads; backend tests pass (`12 passed`).
 
+### Operation 46: Redis Session Heartbeat Coordination
+
+- What changed: added `POST /api/v1/sessions/{session_id}/heartbeat`, heartbeat counters, active status/current gear fields, heartbeat-specific rate limiting, and a session coordination proof artifact.
+- Why: give the backend a lightweight active-session coordination signal that does not depend on anomaly events, preparing for dashboard session lists and proctor workflows.
+- How: extended session-state schemas, Redis session state service, session route handlers, rate limiter policies, and backend tests; added `progress/session-coordination-proof.md`.
+- Result: live session state can now be created and refreshed by heartbeat, anomaly fields are preserved when heartbeat updates arrive, heartbeat abuse is rate-limited, and backend tests pass (`15 passed`).
+
 ## 2026-05-08: Phase 1 Runtime Reliability And Live Datapoints Visibility
 
 ### Operation 34: Live Webcam Datapoints Surface

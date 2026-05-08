@@ -40,6 +40,14 @@ class RateLimiter:
             window_seconds=self.settings.session_state_read_rate_limit_window_seconds,
         )
 
+    def allow_session_heartbeat(self, session_id: str) -> tuple[bool, int]:
+        return self.allow(
+            namespace="session:heartbeat",
+            subject=session_id,
+            limit=self.settings.session_heartbeat_rate_limit_count,
+            window_seconds=self.settings.session_heartbeat_rate_limit_window_seconds,
+        )
+
     def allow(
         self,
         namespace: str,

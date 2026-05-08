@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     signaling_dequeue_rate_limit_window_seconds: int = 60
     session_state_read_rate_limit_count: int = 240
     session_state_read_rate_limit_window_seconds: int = 60
+    session_heartbeat_rate_limit_count: int = 180
+    session_heartbeat_rate_limit_window_seconds: int = 60
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 

@@ -1,6 +1,6 @@
 # LIVE EXECUTION TRACKER
 
-Last updated: 2026-05-08 (Asia/Calcutta)
+Last updated: 2026-05-09 (Asia/Calcutta)
 
 This file is the single live status board for implementation.
 
@@ -32,13 +32,13 @@ This file is the single live status board for implementation.
 
 ## 2) Doing Now
 
-- Post-Phase-1 rate-limit expansion documentation and push.
+- Session coordination documentation and push.
 
 ## 3) Remaining
 
 - Move to post-Phase-1 tasks:
   - Add future Alembic revisions as schema expands.
-  - Add session coordination features on top of Redis live state.
+  - Add proctor-facing dashboard/session list workflows.
 
 ## 4) New Evidence Artifact
 
@@ -57,6 +57,10 @@ This file is the single live status board for implementation.
     - `peer_connection_state: connected`
     - `peer_ice_connection_state: connected`
     - `remote_ice_candidates: 1`
+
+- `progress/session-coordination-proof.md`
+  - Documents Redis-backed heartbeat coordination and merged session-state behavior.
+  - Verified by backend test suite result: `15 passed`.
 
 ## 4) Exact Command Trace (Recent)
 

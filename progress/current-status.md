@@ -22,14 +22,14 @@ Phase 1 core vertical slice is operational end-to-end: camera-frame worker scori
 - Signaling backend now uses Redis queue semantics to avoid overwriting offer/ICE messages under burst conditions.
 - Local DataChannel-open path is now verified with runtime diagnostics (`datachannel_open`, `connected` ICE states, and remote ICE candidate ingestion).
 - Redis-backed rate limiting is implemented for anomaly-score ingestion, signaling enqueue/dequeue, and session-state reads.
-- Redis-backed live session state is implemented and exposed at `GET /api/v1/sessions/{session_id}/state`.
+- Redis-backed live session state is implemented with `GET /api/v1/sessions/{session_id}/state` and heartbeat coordination at `POST /api/v1/sessions/{session_id}/heartbeat`.
 - Alembic baseline scaffold and first migration revision are added under `server/src/db/migrations`.
 - Backend startup now runs Alembic-managed migrations instead of `Base.metadata.create_all`, with a legacy-schema compatibility stamp for pre-Alembic local databases.
 
 ## In Progress
 
 - Add additional migration revisions as backend schema grows.
-- Add explicit session-level integration report artifacts for Phase 1 acceptance evidence.
+- Add additional session-level integration report artifacts as new workflows are implemented.
 
 ## Blocked
 
@@ -39,5 +39,4 @@ Phase 1 core vertical slice is operational end-to-end: camera-frame worker scori
 
 ## Next
 
-- Add session coordination features on top of the Redis live state store.
 - Add explicit session-level integration report artifacts for Phase 1 acceptance evidence.
