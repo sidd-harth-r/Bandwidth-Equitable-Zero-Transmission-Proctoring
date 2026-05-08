@@ -263,3 +263,24 @@ This document records what changed, why it changed, and how it was performed. Co
   - `npm.cmd test`
   - `npm.cmd run build`
 - Result: frontend tests and build passed after typing contract fix; backend regressions also passed.
+
+### Operation 34: RTCDataChannel Score Transport With HTTP Fallback
+
+- What changed: added DataChannel creation in WebRTC session setup and sent anomaly-score payloads over the channel when open, with existing HTTP POST as fallback.
+- Why: complete the next planned Phase 1 transport milestone and align score delivery with the low-latency unreliable channel design while preserving resilience.
+- How: created an `anomaly-scores` DataChannel (`ordered: false`, `maxRetransmits: 0`), added `sendAnomalyScoreOverDataChannel` helper, updated `main.ts` send logic to prefer DataChannel, and expanded tests for open/closed channel behavior.
+- Result: score payload transport now uses DataChannel first and safely falls back to HTTP when channel state is unavailable or closed.
+
+### Operation 35: Command Trace For RTCDataChannel Slice
+
+- What changed: no repository content changed.
+- Why: keep an exact record of executed operations while continuing Phase 1.
+- How: executed the following commands:
+  - `git status --short`
+  - `Get-Content -Path client/src/network/WebRtcSignaling.ts`
+  - `Get-Content -Path client/src/main.ts`
+  - `Get-Content -Path client/src/coordinator/types.ts`
+  - `npm.cmd test`
+  - `npm.cmd run build`
+  - `conda run -n proctor python -m pytest`
+- Result: frontend tests/build and backend regression tests all passed after DataChannel transport integration.

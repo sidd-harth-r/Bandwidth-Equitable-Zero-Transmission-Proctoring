@@ -1,16 +1,24 @@
 import type { SignalEnvelope } from "./SignalingClient";
+import type { AnomalyScorePayload } from "../coordinator/types";
+
+export interface DataChannelLike {
+  readyState: "connecting" | "open" | "closing" | "closed";
+  send(data: string): void;
+}
 
 export interface PeerConnectionLike {
   localDescription: RTCSessionDescription | null;
   createOffer(): Promise<RTCSessionDescriptionInit>;
   setLocalDescription(description: RTCSessionDescriptionInit): Promise<void>;
   setRemoteDescription(description: RTCSessionDescriptionInit): Promise<void>;
+  createDataChannel(label: string, options?: RTCDataChannelInit): DataChannelLike;
   close(): void;
   onicecandidate: ((event: RTCPeerConnectionIceEvent) => void) | null;
 }
 
 export interface WebRtcSession {
   peer: PeerConnectionLike;
+  dataChannel: DataChannelLike;
   waitForAnswer: Promise<boolean>;
 }
 
@@ -36,6 +44,11 @@ export async function startWebRtcSignaling(
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
   })
 ): Promise<WebRtcSession> {
+  const dataChannel = peer.createDataChannel("anomaly-scores", {
+    ordered: false,
+    maxRetransmits: 0
+  });
+
   peer.onicecandidate = (event) => {
     if (!event.candidate) {
       return;
@@ -66,6 +79,7 @@ export async function startWebRtcSignaling(
 
   return {
     peer,
+    dataChannel,
     waitForAnswer: waitForAnswer(signaling, ids, peer)
   };
 }
@@ -96,4 +110,15 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+export function sendAnomalyScoreOverDataChannel(
+  dataChannel: DataChannelLike,
+  payload: AnomalyScorePayload
+): boolean {
+  if (dataChannel.readyState !== "open") {
+    return false;
+  }
+  dataChannel.send(JSON.stringify(payload));
+  return true;
 }

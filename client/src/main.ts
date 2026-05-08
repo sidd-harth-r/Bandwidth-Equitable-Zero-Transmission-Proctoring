@@ -3,7 +3,11 @@ import { TierClassifier } from "./coordinator/TierClassifier";
 import type { AnomalyScorePayload, WorkerScoreMessage } from "./coordinator/types";
 import { AnomalyScoreClient } from "./network/AnomalyScoreClient";
 import { SignalingClient } from "./network/SignalingClient";
-import { startWebRtcSignaling, type WebRtcSession } from "./network/WebRtcSignaling";
+import {
+  sendAnomalyScoreOverDataChannel,
+  startWebRtcSignaling,
+  type WebRtcSession
+} from "./network/WebRtcSignaling";
 import { SessionStore } from "./storage/SessionStore";
 
 import "./styles.css";
@@ -98,11 +102,20 @@ async function handleWorkerScore(message: WorkerScoreMessage): Promise<void> {
   };
 
   await store.addAnomalyEvent(payload);
-  try {
-    await client.send(payload);
-    if (status) status.textContent = `Sent ${payload.tier}`;
-  } catch (error) {
-    if (status) status.textContent = "Stored locally; API unavailable";
+  const sentViaDataChannel =
+    webRtcSession !== undefined
+      ? sendAnomalyScoreOverDataChannel(webRtcSession.dataChannel, payload)
+      : false;
+
+  if (sentViaDataChannel) {
+    if (status) status.textContent = `Sent ${payload.tier} (DataChannel)`;
+  } else {
+    try {
+      await client.send(payload);
+      if (status) status.textContent = `Sent ${payload.tier} (HTTP fallback)`;
+    } catch (error) {
+      if (status) status.textContent = "Stored locally; API unavailable";
+    }
   }
 
   if (latest) {
