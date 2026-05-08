@@ -350,6 +350,13 @@ This document records what changed, why it changed, and how it was performed. Co
 - How: updated `client/src/network/WebRtcSignaling.ts`, `client/src/network/LocalProctorLoopback.ts`, `client/src/network/SignalingClient.ts`, `client/src/main.ts`, `client/src/styles.css`, and `client/tests/webrtc-signaling.test.ts`; iteratively validated with user-shared runtime debug JSON plus `npm.cmd test` and `npm.cmd run build`.
 - Result: DataChannel-open path confirmed in runtime with `event: datachannel_open`, `answer_received: true`, `peer_connection_state: connected`, `peer_ice_connection_state: connected`, and `remote_ice_candidates: 1`.
 
+### Operation 43: Backend Hardening - Rate Limiting, Live Session State, Alembic Baseline
+
+- What changed: added Redis-backed ingestion rate limiter, Redis-backed live session state service, session-state API route, Alembic configuration scaffold, and first baseline migration revision.
+- Why: proceed to the next implementation-plan items after Phase 1 transport closure, specifically backend operational hardening and migration readiness.
+- How: implemented `RateLimiter` and `SessionStateStore` services; wired dependency injection and route updates in anomaly ingestion and new session state route; added Alembic files under `server/alembic.ini` and `server/src/db/migrations`; added/updated backend tests.
+- Result: anomaly ingestion now enforces a token-window style limit with HTTP 429 on overflow, session state is queryable via `GET /api/v1/sessions/{session_id}/state`, and backend tests pass (`8 passed`).
+
 ## 2026-05-08: Phase 1 Runtime Reliability And Live Datapoints Visibility
 
 ### Operation 34: Live Webcam Datapoints Surface

@@ -77,6 +77,54 @@ def test_anomaly_summary_cache_invalidation_after_new_event() -> None:
         assert updated.json()["latest_score"]["weighted_score"] == 0.83
 
 
+def test_session_state_updates_on_ingest() -> None:
+    app = create_app()
+    payload = {
+        "session_id": "session-state-001",
+        "student_id": "student-state-001",
+        "channel_scores": {"pose_gaze": 0.44, "rppg": 0.0, "au": 0.0, "keystroke": 0.0},
+        "agreement_index": 0.0,
+        "weighted_score": 0.44,
+        "tier": "tier_3",
+        "gear": "gear_1",
+        "metadata": {"source": "test"},
+    }
+    with TestClient(app) as client:
+        clear_anomaly_events(app)
+        clear_session_cache(app, "session-state-001")
+        clear_session_state(app, "session-state-001")
+        created = client.post("/api/v1/anomaly-scores", json=payload)
+        state = client.get("/api/v1/sessions/session-state-001/state")
+
+        assert created.status_code == 201
+        assert state.status_code == 200
+        assert state.json()["session_id"] == "session-state-001"
+        assert state.json()["student_id"] == "student-state-001"
+        assert state.json()["event_count"] == 1
+        assert state.json()["last_tier"] == "tier_3"
+
+
+def test_ingestion_rate_limit_enforced() -> None:
+    app = create_app()
+
+    payload = {
+        "session_id": "session-rate-001",
+        "student_id": "student-rate-001",
+        "channel_scores": {"pose_gaze": 0.12, "rppg": 0.0, "au": 0.0, "keystroke": 0.0},
+        "agreement_index": 0.0,
+        "weighted_score": 0.12,
+        "tier": "tier_3",
+        "gear": "gear_1",
+        "metadata": {"source": "test"},
+    }
+
+    with TestClient(app) as client:
+        app.state.redis.delete("bezp:rate:ingest:student-rate-001")
+        app.state.redis.setex("bezp:rate:ingest:student-rate-001", 60, 120)
+        response = client.post("/api/v1/anomaly-scores", json=payload)
+        assert response.status_code == 429
+
+
 def test_anomaly_score_rejects_raw_frame_metadata() -> None:
     with TestClient(create_app()) as client:
         payload = {
@@ -142,3 +190,7 @@ def clear_anomaly_events(app) -> None:
 
 def clear_session_cache(app, session_id: str) -> None:
     app.state.redis.delete(f"bezp:session-summary:{session_id}")
+
+
+def clear_session_state(app, session_id: str) -> None:
+    app.state.redis.delete(f"bezp:session-state:{session_id}")

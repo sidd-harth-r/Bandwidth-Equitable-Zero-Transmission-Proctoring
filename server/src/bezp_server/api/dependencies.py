@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from bezp_server.config import get_settings
 from bezp_server.services.session_cache import SessionCache
+from bezp_server.services.session_state import SessionStateStore
+from bezp_server.services.rate_limiter import RateLimiter
 from bezp_server.services.sql_anomaly_store import SqlAnomalyStore
 
 
@@ -24,3 +26,11 @@ def get_redis(request: Request) -> Redis:
 
 def get_session_cache(redis_client: Redis = Depends(get_redis)) -> SessionCache:
     return SessionCache(redis_client, get_settings())
+
+
+def get_session_state_store(redis_client: Redis = Depends(get_redis)) -> SessionStateStore:
+    return SessionStateStore(redis_client, get_settings())
+
+
+def get_rate_limiter(redis_client: Redis = Depends(get_redis)) -> RateLimiter:
+    return RateLimiter(redis_client, get_settings())

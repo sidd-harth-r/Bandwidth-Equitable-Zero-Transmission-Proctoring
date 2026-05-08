@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     redis_port: int = 6379
     redis_db: int = 0
     redis_session_summary_ttl_seconds: int = 300
+    redis_session_state_ttl_seconds: int = 1800
+    ingest_rate_limit_count: int = 120
+    ingest_rate_limit_window_seconds: int = 60
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
