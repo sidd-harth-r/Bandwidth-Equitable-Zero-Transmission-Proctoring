@@ -32,13 +32,13 @@ This file is the single live status board for implementation.
 
 ## 2) Doing Now
 
-- Post-Phase-1 backend hardening documentation and push.
+- Post-Phase-1 rate-limit expansion documentation and push.
 
 ## 3) Remaining
 
 - Move to post-Phase-1 tasks:
-  - Expand rate-limit coverage and per-endpoint policy controls.
   - Add future Alembic revisions as schema expands.
+  - Add session coordination features on top of Redis live state.
 
 ## 4) New Evidence Artifact
 

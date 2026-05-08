@@ -364,6 +364,13 @@ This document records what changed, why it changed, and how it was performed. Co
 - How: updated `server/src/bezp_server/db/session.py`, `server/src/db/migrations/env.py`, `server/src/db/migrations/versions/20260508_0001_create_anomaly_events.py`, `server/alembic.ini`, and startup regression tests; restarted local containers when PostgreSQL was found offline during validation.
 - Result: backend startup now runs Alembic-managed migrations, legacy local databases are stamped to baseline instead of failing on duplicate tables, and backend tests pass (`9 passed`).
 
+### Operation 45: Redis Rate-Limit Policy Expansion
+
+- What changed: generalized the Redis rate limiter and added endpoint policies for signaling enqueue, signaling dequeue, and session-state reads in addition to anomaly-score ingestion.
+- Why: reduce abuse risk on high-frequency API paths now that local WebRTC signaling and live session state are active.
+- How: added configurable limits in `server/src/bezp_server/config.py`, expanded `RateLimiter` policy methods, wired rate checks into signaling and session-state routes, and added backend tests for each new 429 path.
+- Result: Redis-backed rate limiting now covers anomaly ingestion, signaling enqueue/dequeue, and session-state reads; backend tests pass (`12 passed`).
+
 ## 2026-05-08: Phase 1 Runtime Reliability And Live Datapoints Visibility
 
 ### Operation 34: Live Webcam Datapoints Surface

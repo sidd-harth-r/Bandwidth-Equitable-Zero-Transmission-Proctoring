@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     redis_session_state_ttl_seconds: int = 1800
     ingest_rate_limit_count: int = 120
     ingest_rate_limit_window_seconds: int = 60
+    signaling_enqueue_rate_limit_count: int = 180
+    signaling_enqueue_rate_limit_window_seconds: int = 60
+    signaling_dequeue_rate_limit_count: int = 600
+    signaling_dequeue_rate_limit_window_seconds: int = 60
+    session_state_read_rate_limit_count: int = 240
+    session_state_read_rate_limit_window_seconds: int = 60
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 

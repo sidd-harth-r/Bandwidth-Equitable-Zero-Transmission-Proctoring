@@ -21,15 +21,15 @@ Phase 1 core vertical slice is operational end-to-end: camera-frame worker scori
 - Backend CORS now supports dynamic local Vite ports (`localhost`/`127.0.0.1`) to prevent false API-unavailable states in browser sessions.
 - Signaling backend now uses Redis queue semantics to avoid overwriting offer/ICE messages under burst conditions.
 - Local DataChannel-open path is now verified with runtime diagnostics (`datachannel_open`, `connected` ICE states, and remote ICE candidate ingestion).
-- Redis-backed ingestion rate limiting is implemented for anomaly-score POST path.
+- Redis-backed rate limiting is implemented for anomaly-score ingestion, signaling enqueue/dequeue, and session-state reads.
 - Redis-backed live session state is implemented and exposed at `GET /api/v1/sessions/{session_id}/state`.
 - Alembic baseline scaffold and first migration revision are added under `server/src/db/migrations`.
 - Backend startup now runs Alembic-managed migrations instead of `Base.metadata.create_all`, with a legacy-schema compatibility stamp for pre-Alembic local databases.
 
 ## In Progress
 
-- Expand rate-limit policies beyond anomaly ingestion.
 - Add additional migration revisions as backend schema grows.
+- Add explicit session-level integration report artifacts for Phase 1 acceptance evidence.
 
 ## Blocked
 
@@ -39,5 +39,5 @@ Phase 1 core vertical slice is operational end-to-end: camera-frame worker scori
 
 ## Next
 
-- Expand per-endpoint Redis rate limiting and session coordination features.
+- Add session coordination features on top of the Redis live state store.
 - Add explicit session-level integration report artifacts for Phase 1 acceptance evidence.

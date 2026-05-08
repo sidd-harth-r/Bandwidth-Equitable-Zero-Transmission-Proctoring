@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from bezp_server.api.dependencies import get_session_state_store
+from bezp_server.api.dependencies import get_rate_limiter, get_session_state_store
 from bezp_server.schemas.session_state import SessionStateOut
+from bezp_server.services.rate_limiter import RateLimiter
 from bezp_server.services.session_state import SessionStateStore
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -11,7 +12,14 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 def get_session_state(
     session_id: str,
     state_store: SessionStateStore = Depends(get_session_state_store),
+    rate_limiter: RateLimiter = Depends(get_rate_limiter),
 ) -> SessionStateOut:
+    allowed, retry_after_seconds = rate_limiter.allow_session_state_read(session_id)
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Session state read rate limit exceeded. Retry after {retry_after_seconds}s.",
+        )
     data = state_store.get(session_id)
     if data is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session state not found.")

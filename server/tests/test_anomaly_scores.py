@@ -105,6 +105,7 @@ def test_session_state_updates_on_ingest() -> None:
         clear_anomaly_events(app)
         clear_session_cache(app, "session-state-001")
         clear_session_state(app, "session-state-001")
+        clear_rate_key(app, "session-state:read", "session-state-001")
         created = client.post("/api/v1/anomaly-scores", json=payload)
         state = client.get("/api/v1/sessions/session-state-001/state")
 
@@ -131,8 +132,8 @@ def test_ingestion_rate_limit_enforced() -> None:
     }
 
     with TestClient(app) as client:
-        app.state.redis.delete("bezp:rate:ingest:student-rate-001")
-        app.state.redis.setex("bezp:rate:ingest:student-rate-001", 60, 120)
+        clear_rate_key(app, "ingest", "student-rate-001")
+        set_rate_count(app, "ingest", "student-rate-001", 120)
         response = client.post("/api/v1/anomaly-scores", json=payload)
         assert response.status_code == 429
 
@@ -166,6 +167,8 @@ def test_signaling_enqueue_and_dequeue() -> None:
 
     with TestClient(app) as client:
         clear_session_cache(app, "session-signal-001")
+        clear_rate_key(app, "signaling:enqueue", "student-001")
+        clear_rate_key(app, "signaling:dequeue", "proctor-001")
         queued = client.post("/api/v1/signaling", json=signal)
         fetched = client.get("/api/v1/signaling/session-signal-001/proctor-001/offer")
         missing = client.get("/api/v1/signaling/session-signal-001/proctor-001/offer")
@@ -175,6 +178,35 @@ def test_signaling_enqueue_and_dequeue() -> None:
         assert fetched.status_code == 200
         assert fetched.json()["payload"] == signal["payload"]
         assert missing.status_code == 404
+
+
+def test_signaling_enqueue_rate_limit_enforced() -> None:
+    app = create_app()
+    signal = {
+        "session_id": "session-signal-rate-001",
+        "sender_id": "student-rate-signal-001",
+        "target_id": "proctor-001",
+        "signal_type": "offer",
+        "payload": '{"type":"offer","sdp":"fake-sdp"}',
+    }
+
+    with TestClient(app) as client:
+        clear_rate_key(app, "signaling:enqueue", "student-rate-signal-001")
+        set_rate_count(app, "signaling:enqueue", "student-rate-signal-001", 180)
+        response = client.post("/api/v1/signaling", json=signal)
+
+        assert response.status_code == 429
+
+
+def test_signaling_dequeue_rate_limit_enforced() -> None:
+    app = create_app()
+
+    with TestClient(app) as client:
+        clear_rate_key(app, "signaling:dequeue", "proctor-rate-001")
+        set_rate_count(app, "signaling:dequeue", "proctor-rate-001", 600)
+        response = client.get("/api/v1/signaling/session-rate-001/proctor-rate-001/offer")
+
+        assert response.status_code == 429
 
 
 def test_signaling_rejects_invalid_signal_type() -> None:
@@ -188,10 +220,22 @@ def test_signaling_rejects_invalid_signal_type() -> None:
     }
 
     with TestClient(app) as client:
+        clear_rate_key(app, "signaling:enqueue", "student-001")
         client.post("/api/v1/signaling", json=signal)
         invalid = client.get("/api/v1/signaling/session-signal-002/proctor-001/not-a-type")
 
         assert invalid.status_code == 422
+
+
+def test_session_state_read_rate_limit_enforced() -> None:
+    app = create_app()
+
+    with TestClient(app) as client:
+        clear_rate_key(app, "session-state:read", "session-rate-read-001")
+        set_rate_count(app, "session-state:read", "session-rate-read-001", 240)
+        response = client.get("/api/v1/sessions/session-rate-read-001/state")
+
+        assert response.status_code == 429
 
 
 def clear_anomaly_events(app) -> None:
@@ -206,3 +250,11 @@ def clear_session_cache(app, session_id: str) -> None:
 
 def clear_session_state(app, session_id: str) -> None:
     app.state.redis.delete(f"bezp:session-state:{session_id}")
+
+
+def clear_rate_key(app, namespace: str, subject: str) -> None:
+    app.state.redis.delete(f"bezp:rate:{namespace}:{subject}")
+
+
+def set_rate_count(app, namespace: str, subject: str, count: int) -> None:
+    app.state.redis.setex(f"bezp:rate:{namespace}:{subject}", 60, count)
