@@ -32,7 +32,7 @@ This file is the single live status board for implementation.
 
 ## 2) Doing Now
 
-- Preparing commit + push after DataChannel reliability hardening and integration proof artifact generation.
+- Manual verification run for explicit DataChannel state indicator (`DataChannel: open, sent=n`).
 
 ## 3) Remaining
 
@@ -46,6 +46,10 @@ This file is the single live status board for implementation.
 - `progress/phase1-integration-proof.json`
   - Contains timestamped POST + GET proof for `/api/v1/anomaly-scores` and `/api/v1/anomaly-scores/{session_id}`.
   - Confirms backend ingestion and summary retrieval path is operational.
+
+- `client UI runtime indicator`
+  - Added `DataChannel: ...` live state text in toolbar.
+  - Increments send counter when payload is transmitted over DataChannel.
 
 ## 4) Exact Command Trace (Recent)
 

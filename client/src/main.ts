@@ -38,6 +38,7 @@ let overlayCanvas: HTMLCanvasElement | undefined;
 let overlayContext: CanvasRenderingContext2D | null = null;
 let loopbackHandle: LoopbackHandle | undefined;
 let sentEventCount = 0;
+let dataChannelSentCount = 0;
 
 app.innerHTML = `
   <section class="shell">
@@ -50,6 +51,7 @@ app.innerHTML = `
       <button id="start" type="button">Start Session</button>
       <button id="stop" type="button" disabled>Stop</button>
       <span id="status">Idle</span>
+      <span id="dc-status">DataChannel: not-started</span>
     </div>
     <section class="telemetry">
       <article class="camera-panel">
@@ -75,6 +77,7 @@ app.innerHTML = `
 const startButton = document.querySelector<HTMLButtonElement>("#start");
 const stopButton = document.querySelector<HTMLButtonElement>("#stop");
 const status = document.querySelector<HTMLSpanElement>("#status");
+const dcStatus = document.querySelector<HTMLSpanElement>("#dc-status");
 const latest = document.querySelector<HTMLPreElement>("#latest");
 const cameraState = document.querySelector<HTMLParagraphElement>("#camera-state");
 const liveDatapoints = document.querySelector<HTMLPreElement>("#live-datapoints");
@@ -96,6 +99,7 @@ startButton?.addEventListener("click", async () => {
       studentId,
       proctorId
     });
+    bindDataChannelStatus(webRtcSession.dataChannel);
     void updateSignalingStatus(webRtcSession);
   } catch {
     if (status) {
@@ -159,7 +163,11 @@ async function handleWorkerScore(message: WorkerScoreMessage): Promise<void> {
 
   if (sentViaDataChannel) {
     sentEventCount += 1;
+    dataChannelSentCount += 1;
     if (status) status.textContent = `Sent ${payload.tier} (DataChannel) #${sentEventCount} ${formatNow()}`;
+    if (dcStatus) {
+      dcStatus.textContent = `DataChannel: open, sent=${dataChannelSentCount}`;
+    }
   } else {
     try {
       await client.send(payload);
@@ -374,6 +382,28 @@ function updateLiveDatapoints(message: WorkerScoreMessage): void {
       : null
   };
   liveDatapoints.textContent = JSON.stringify(payload, null, 2);
+}
+
+function bindDataChannelStatus(channel: {
+  readyState: string;
+  addEventListener?: (type: string, listener: () => void) => void;
+}): void {
+  if (!dcStatus) {
+    return;
+  }
+  dcStatus.textContent = `DataChannel: ${channel.readyState}`;
+  if (typeof channel.addEventListener === "function") {
+    channel.addEventListener("open", () => {
+      if (dcStatus) {
+        dcStatus.textContent = `DataChannel: open, sent=${dataChannelSentCount}`;
+      }
+    });
+    channel.addEventListener("close", () => {
+      if (dcStatus) {
+        dcStatus.textContent = "DataChannel: closed";
+      }
+    });
+  }
 }
 
 async function updateSignalingStatus(session: WebRtcSession): Promise<void> {
