@@ -13,6 +13,11 @@ export interface WorkerScoreMessage {
   score: number;
   reason: string;
   sampledAt: string;
+  landmarks?: {
+    nose: { x: number; y: number };
+    leftShoulder: { x: number; y: number };
+    rightShoulder: { x: number; y: number };
+  };
 }
 
 export interface FusionResult {

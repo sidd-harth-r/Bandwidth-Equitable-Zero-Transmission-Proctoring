@@ -68,10 +68,16 @@ export function startLocalProctorLoopback(
       }
     }
 
-    const candidateSignal = await signaling.dequeueSignal(ids.sessionId, ids.proctorId, "ice_candidate");
-    if (candidateSignal) {
-      const candidate = JSON.parse(candidateSignal.payload) as RTCIceCandidateInit;
-      await peer.addIceCandidate(candidate);
+    if (offerApplied) {
+      const candidateSignal = await signaling.dequeueSignal(ids.sessionId, ids.proctorId, "ice_candidate");
+      if (candidateSignal) {
+        try {
+          const candidate = JSON.parse(candidateSignal.payload) as RTCIceCandidateInit;
+          await peer.addIceCandidate(candidate);
+        } catch {
+          // Ignore malformed or premature candidates in loopback mode.
+        }
+      }
     }
   }
 

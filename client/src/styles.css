@@ -46,6 +46,58 @@ h1 {
   flex-wrap: wrap;
 }
 
+.telemetry {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  width: min(100%, 900px);
+}
+
+.camera-panel,
+.detect-panel {
+  border: 1px solid #d5dde3;
+  border-radius: 6px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.camera-panel h2,
+.detect-panel h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+#camera-feed {
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 4 / 3;
+  border-radius: 4px;
+  border: 1px solid #d5dde3;
+  background: #0f1720;
+  object-fit: cover;
+}
+
+.camera-stage {
+  position: relative;
+  width: min(100%, 420px);
+}
+
+#camera-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+#camera-state,
+#detect-mode,
+#detect-what,
+#detect-score {
+  margin: 8px 0 0;
+  color: #31424d;
+}
+
 button {
   min-height: 40px;
   border: 1px solid #1d4f6e;

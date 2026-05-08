@@ -18,6 +18,7 @@ let poseDetector: MediaPipePoseApi | undefined;
 let poseReady = false;
 let poseFailed = false;
 let latestPoseScore: number | null = null;
+let lastPoseLandmarks: NormalizedLandmarkList | undefined;
 const workerScope = self as unknown as {
   onmessage: (event: MessageEvent<WorkerInputMessage>) => void;
   setInterval: typeof setInterval;
@@ -73,11 +74,13 @@ async function processFrame(frame: {
       await poseDetector.send({ image: imageData });
       const poseScore = latestPoseScore;
       if (poseScore !== null) {
+        const landmarks = extractOverlayLandmarks(lastPoseLandmarks);
         workerScope.postMessage({
           type: "pose_gaze_score",
           score: poseScore,
           reason: "mediapipe_pose_head_orientation_proxy",
-          sampledAt: new Date().toISOString()
+          sampledAt: new Date().toISOString(),
+          landmarks: landmarks ?? undefined
         });
         return;
       }
@@ -118,6 +121,7 @@ async function ensurePoseDetector(): Promise<void> {
       minTrackingConfidence: 0.5
     });
     poseDetector.onResults((results) => {
+      lastPoseLandmarks = results.poseLandmarks;
       latestPoseScore = scoreFromLandmarks(results.poseLandmarks);
     });
     poseReady = true;
@@ -146,6 +150,27 @@ function scoreFromLandmarks(landmarks: NormalizedLandmarkList | undefined): numb
   const pitchLike = Math.min(1, Math.abs(nose.y - shoulderCenterY) / (shoulderWidth * 0.9));
   const raw = yawLike * 0.65 + pitchLike * 0.35;
   return Math.max(0, Math.min(1, raw));
+}
+
+function extractOverlayLandmarks(
+  landmarks: NormalizedLandmarkList | undefined
+): WorkerScoreMessage["landmarks"] | null {
+  if (!landmarks || landmarks.length < 13) {
+    return null;
+  }
+
+  const nose = landmarks[0];
+  const rightShoulder = landmarks[11];
+  const leftShoulder = landmarks[12];
+  if (!nose || !rightShoulder || !leftShoulder) {
+    return null;
+  }
+
+  return {
+    nose: { x: nose.x, y: nose.y },
+    leftShoulder: { x: leftShoulder.x, y: leftShoulder.y },
+    rightShoulder: { x: rightShoulder.x, y: rightShoulder.y }
+  };
 }
 
 function scoreFromFrame(width: number, height: number, pixels: Uint8ClampedArray): number {

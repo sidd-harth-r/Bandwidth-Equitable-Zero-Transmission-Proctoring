@@ -34,7 +34,10 @@ let framePumpId: ReturnType<typeof setInterval> | undefined;
 let captureCanvas: HTMLCanvasElement | undefined;
 let captureContext: CanvasRenderingContext2D | null = null;
 let captureVideo: HTMLVideoElement | undefined;
+let overlayCanvas: HTMLCanvasElement | undefined;
+let overlayContext: CanvasRenderingContext2D | null = null;
 let loopbackHandle: LoopbackHandle | undefined;
+let sentEventCount = 0;
 
 app.innerHTML = `
   <section class="shell">
@@ -48,6 +51,22 @@ app.innerHTML = `
       <button id="stop" type="button" disabled>Stop</button>
       <span id="status">Idle</span>
     </div>
+    <section class="telemetry">
+      <article class="camera-panel">
+        <h2>Camera Feed</h2>
+        <div class="camera-stage">
+          <video id="camera-feed" autoplay playsinline muted></video>
+          <canvas id="camera-overlay" width="320" height="240"></canvas>
+        </div>
+        <p id="camera-state">Camera: not started</p>
+      </article>
+      <article class="detect-panel">
+        <h2>Detection Details</h2>
+        <p id="detect-mode">Mode: waiting</p>
+        <p id="detect-what">Detects: head orientation proxy (nose vs shoulders), frame motion, and brightness shifts.</p>
+        <p id="detect-score">Score: waiting</p>
+      </article>
+    </section>
     <pre id="latest">{}</pre>
   </section>
 `;
@@ -56,6 +75,11 @@ const startButton = document.querySelector<HTMLButtonElement>("#start");
 const stopButton = document.querySelector<HTMLButtonElement>("#stop");
 const status = document.querySelector<HTMLSpanElement>("#status");
 const latest = document.querySelector<HTMLPreElement>("#latest");
+const cameraState = document.querySelector<HTMLParagraphElement>("#camera-state");
+const detectMode = document.querySelector<HTMLParagraphElement>("#detect-mode");
+const detectScore = document.querySelector<HTMLParagraphElement>("#detect-score");
+const cameraFeed = document.querySelector<HTMLVideoElement>("#camera-feed");
+const cameraOverlay = document.querySelector<HTMLCanvasElement>("#camera-overlay");
 
 startButton?.addEventListener("click", async () => {
   await startCameraCapture();
@@ -125,11 +149,15 @@ async function handleWorkerScore(message: WorkerScoreMessage): Promise<void> {
       : false;
 
   if (sentViaDataChannel) {
-    if (status) status.textContent = `Sent ${payload.tier} (DataChannel)`;
+    sentEventCount += 1;
+    if (status) status.textContent = `Sent ${payload.tier} (DataChannel) #${sentEventCount} ${formatNow()}`;
   } else {
     try {
       await client.send(payload);
-      if (status) status.textContent = `Sent ${payload.tier} (HTTP fallback)`;
+      sentEventCount += 1;
+      if (status) {
+        status.textContent = `Sent ${payload.tier} (HTTP fallback) #${sentEventCount} ${formatNow()}`;
+      }
     } catch (error) {
       if (status) status.textContent = "Stored locally; API unavailable";
     }
@@ -138,6 +166,9 @@ async function handleWorkerScore(message: WorkerScoreMessage): Promise<void> {
   if (latest) {
     latest.textContent = JSON.stringify(payload, null, 2);
   }
+
+  updateDetectionDetails(message.reason, message.score);
+  drawOverlay(message);
 }
 
 async function startCameraCapture(): Promise<void> {
@@ -149,11 +180,23 @@ async function startCameraCapture(): Promise<void> {
     video: { width: 320, height: 240, frameRate: { ideal: 10, max: 15 } },
     audio: false
   });
-  captureVideo = document.createElement("video");
-  captureVideo.playsInline = true;
-  captureVideo.muted = true;
+  if (!cameraFeed) {
+    throw new Error("Missing camera feed element");
+  }
+  captureVideo = cameraFeed;
   captureVideo.srcObject = mediaStream;
   await captureVideo.play();
+
+  overlayCanvas = cameraOverlay ?? undefined;
+  overlayContext = overlayCanvas?.getContext("2d") ?? null;
+  if (overlayCanvas) {
+    overlayCanvas.width = 320;
+    overlayCanvas.height = 240;
+  }
+
+  if (cameraState) {
+    cameraState.textContent = "Camera: active";
+  }
 
   captureCanvas = document.createElement("canvas");
   captureCanvas.width = 160;
@@ -173,8 +216,16 @@ function stopCameraCapture(): void {
   }
   mediaStream = undefined;
   captureVideo = undefined;
+  if (overlayContext && overlayCanvas) {
+    overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  }
+  overlayCanvas = undefined;
+  overlayContext = null;
   captureCanvas = undefined;
   captureContext = null;
+  if (cameraState) {
+    cameraState.textContent = "Camera: stopped";
+  }
 }
 
 function startFramePump(): void {
@@ -203,6 +254,79 @@ function stopFramePump(): void {
     clearInterval(framePumpId);
     framePumpId = undefined;
   }
+}
+
+function formatNow(): string {
+  const now = new Date();
+  return now.toLocaleTimeString();
+}
+
+function updateDetectionDetails(reason: string, score: number): void {
+  if (detectMode) {
+    if (reason.includes("mediapipe_pose")) {
+      detectMode.textContent = "Mode: MediaPipe Pose landmarks (nose/shoulder orientation proxy)";
+    } else if (reason.includes("fallback")) {
+      detectMode.textContent = "Mode: fallback frame proxy (motion + brightness + center drift)";
+    } else {
+      detectMode.textContent = `Mode: ${reason}`;
+    }
+  }
+
+  if (detectScore) {
+    const band = score >= 0.6 ? "elevated" : score >= 0.3 ? "moderate" : "low";
+    detectScore.textContent = `Score: ${score.toFixed(3)} (${band})`;
+  }
+}
+
+function drawOverlay(message: WorkerScoreMessage): void {
+  if (!overlayContext || !overlayCanvas) {
+    return;
+  }
+
+  overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  if (!message.landmarks) {
+    return;
+  }
+
+  const nose = mapPoint(message.landmarks.nose, overlayCanvas.width, overlayCanvas.height);
+  const leftShoulder = mapPoint(
+    message.landmarks.leftShoulder,
+    overlayCanvas.width,
+    overlayCanvas.height
+  );
+  const rightShoulder = mapPoint(
+    message.landmarks.rightShoulder,
+    overlayCanvas.width,
+    overlayCanvas.height
+  );
+
+  overlayContext.strokeStyle = "#15aabf";
+  overlayContext.lineWidth = 2;
+  overlayContext.beginPath();
+  overlayContext.moveTo(leftShoulder.x, leftShoulder.y);
+  overlayContext.lineTo(rightShoulder.x, rightShoulder.y);
+  overlayContext.stroke();
+
+  drawPoint(nose.x, nose.y, "#ff6b6b");
+  drawPoint(leftShoulder.x, leftShoulder.y, "#4dabf7");
+  drawPoint(rightShoulder.x, rightShoulder.y, "#4dabf7");
+}
+
+function drawPoint(x: number, y: number, color: string): void {
+  if (!overlayContext) {
+    return;
+  }
+  overlayContext.fillStyle = color;
+  overlayContext.beginPath();
+  overlayContext.arc(x, y, 4, 0, Math.PI * 2);
+  overlayContext.fill();
+}
+
+function mapPoint(point: { x: number; y: number }, width: number, height: number): { x: number; y: number } {
+  return {
+    x: point.x * width,
+    y: point.y * height
+  };
 }
 
 async function updateSignalingStatus(session: WebRtcSession): Promise<void> {
