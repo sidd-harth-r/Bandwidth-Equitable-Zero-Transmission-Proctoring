@@ -1,8 +1,23 @@
 import type { WorkerScoreMessage } from "../coordinator/types";
+import type {
+  NormalizedLandmarkList,
+  Options as MediaPipePoseOptions,
+  Results as MediaPipePoseResults
+} from "@mediapipe/pose";
 
 let intervalId: ReturnType<typeof setInterval> | undefined;
 let previousCenter: { x: number; y: number } | undefined;
 let previousBrightness = 0.5;
+type MediaPipePoseApi = {
+  send(input: { image: ImageData }): Promise<void>;
+  setOptions(options: MediaPipePoseOptions): void;
+  onResults(callback: (results: MediaPipePoseResults) => void): void;
+};
+
+let poseDetector: MediaPipePoseApi | undefined;
+let poseReady = false;
+let poseFailed = false;
+let latestPoseScore: number | null = null;
 const workerScope = self as unknown as {
   onmessage: (event: MessageEvent<WorkerInputMessage>) => void;
   setInterval: typeof setInterval;
@@ -18,11 +33,12 @@ type WorkerInputMessage =
 workerScope.onmessage = (event: MessageEvent<WorkerInputMessage>) => {
   if (event.data.type === "start" && intervalId === undefined) {
     previousCenter = undefined;
+    void ensurePoseDetector();
     intervalId = workerScope.setInterval(() => {
       const message: WorkerScoreMessage = {
         type: "pose_gaze_score",
         score: 0.1,
-        reason: "waiting_for_camera_frames",
+        reason: poseReady ? "waiting_for_camera_frames_pose_ready" : "waiting_for_camera_frames",
         sampledAt: new Date().toISOString()
       };
       workerScope.postMessage(message);
@@ -30,14 +46,7 @@ workerScope.onmessage = (event: MessageEvent<WorkerInputMessage>) => {
   }
 
   if (event.data.type === "frame") {
-    const score = scoreFromFrame(event.data.width, event.data.height, event.data.pixels);
-    const message: WorkerScoreMessage = {
-      type: "pose_gaze_score",
-      score,
-      reason: "camera_frame_motion_orientation_proxy",
-      sampledAt: new Date().toISOString()
-    };
-    workerScope.postMessage(message);
+    void processFrame(event.data);
   }
 
   if (event.data.type === "stop" && intervalId !== undefined) {
@@ -46,6 +55,98 @@ workerScope.onmessage = (event: MessageEvent<WorkerInputMessage>) => {
     previousCenter = undefined;
   }
 };
+
+async function processFrame(frame: {
+  width: number;
+  height: number;
+  pixels: Uint8ClampedArray;
+}): Promise<void> {
+  const proxyScore = scoreFromFrame(frame.width, frame.height, frame.pixels);
+
+  if (!poseFailed) {
+    await ensurePoseDetector();
+  }
+
+  if (poseDetector && poseReady) {
+    try {
+      const imageData = new ImageData(new Uint8ClampedArray(frame.pixels), frame.width, frame.height);
+      await poseDetector.send({ image: imageData });
+      const poseScore = latestPoseScore;
+      if (poseScore !== null) {
+        workerScope.postMessage({
+          type: "pose_gaze_score",
+          score: poseScore,
+          reason: "mediapipe_pose_head_orientation_proxy",
+          sampledAt: new Date().toISOString()
+        });
+        return;
+      }
+    } catch {
+      poseFailed = true;
+    }
+  }
+
+  workerScope.postMessage({
+    type: "pose_gaze_score",
+    score: proxyScore,
+    reason: "camera_frame_motion_orientation_proxy_fallback",
+    sampledAt: new Date().toISOString()
+  });
+}
+
+async function ensurePoseDetector(): Promise<void> {
+  if (poseReady || poseFailed || poseDetector) {
+    return;
+  }
+
+  try {
+    const mediaPipePose = await import("@mediapipe/pose");
+    const PoseCtor = (mediaPipePose as unknown as { Pose?: new (arg: unknown) => MediaPipePoseApi })
+      .Pose;
+    if (!PoseCtor) {
+      poseFailed = true;
+      return;
+    }
+
+    poseDetector = new PoseCtor({
+      locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+    });
+    poseDetector.setOptions({
+      modelComplexity: 0,
+      smoothLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+    poseDetector.onResults((results) => {
+      latestPoseScore = scoreFromLandmarks(results.poseLandmarks);
+    });
+    poseReady = true;
+  } catch {
+    poseFailed = true;
+  }
+}
+
+function scoreFromLandmarks(landmarks: NormalizedLandmarkList | undefined): number | null {
+  if (!landmarks || landmarks.length === 0) {
+    return null;
+  }
+
+  const nose = landmarks[0];
+  const rightShoulder = landmarks[11];
+  const leftShoulder = landmarks[12];
+  if (!leftShoulder || !rightShoulder || !nose) {
+    return null;
+  }
+
+  const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
+  const shoulderCenterY = (leftShoulder.y + rightShoulder.y) / 2;
+  const shoulderWidth = Math.max(1, Math.abs(rightShoulder.x - leftShoulder.x));
+
+  const yawLike = Math.min(1, Math.abs(nose.x - shoulderCenterX) / (shoulderWidth * 0.7));
+  const pitchLike = Math.min(1, Math.abs(nose.y - shoulderCenterY) / (shoulderWidth * 0.9));
+  const raw = yawLike * 0.65 + pitchLike * 0.35;
+  return Math.max(0, Math.min(1, raw));
+}
 
 function scoreFromFrame(width: number, height: number, pixels: Uint8ClampedArray): number {
   const sampleStep = 8;

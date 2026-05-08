@@ -308,3 +308,26 @@ This document records what changed, why it changed, and how it was performed. Co
   - `npm.cmd run build`
   - `conda run -n proctor python -m pytest`
 - Result: frontend tests/build and backend regression tests passed after integrating frame-driven worker scoring.
+
+### Operation 38: MediaPipe Pose Worker Integration
+
+- What changed: integrated direct `@mediapipe/pose` worker usage with landmark-based pose scoring and automatic fallback to frame-proxy scoring when model init or inference is unavailable.
+- Why: move Phase 1 pose/gaze channel closer to the intended MediaPipe path while keeping runtime resilience.
+- How: switched from placeholder/heuristic-only worker path to MediaPipe Pose `send/onResults` flow, computed score using nose/shoulder landmarks, and retained fallback path for robustness.
+- Result: MediaPipe Pose integration is active in worker code and frontend build/tests pass.
+
+### Operation 39: Command Trace For MediaPipe Integration Slice
+
+- What changed: no repository content changed.
+- Why: keep exact command visibility while continuing implementation.
+- How: executed the following commands:
+  - `Get-Content -Path client/src/workers/PoseGazeWorker.ts`
+  - `Get-Content -Path client/tsconfig.json`
+  - `Get-Content -Path client/src/vite-env.d.ts`
+  - `npm.cmd test`
+  - `npm.cmd run build`
+  - `npm.cmd ls @mediapipe/pose @tensorflow-models/pose-detection`
+  - `Get-Content -Path node_modules/@mediapipe/pose/index.d.ts -TotalCount 120`
+  - `npm.cmd test`
+  - `npm.cmd run build`
+- Result: build-blocking package/export mismatch was resolved by switching to direct MediaPipe API integration and the client checks passed.

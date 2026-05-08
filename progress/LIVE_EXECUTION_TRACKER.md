@@ -36,20 +36,21 @@ It is updated continuously with:
   - HTTP fallback when DataChannel is unavailable/closed
 - Placeholder sine-wave worker replaced with real camera-frame scoring in `PoseGazeWorker`.
 - Session now pumps sampled webcam frames into the worker during active monitoring and stops cleanly on session stop.
+- MediaPipe Pose integration added directly in the worker with landmark-based head-orientation proxy scoring and automatic fallback to frame-proxy scoring.
 - All related tests/build checks pass after each slice.
 - All changes pushed to GitHub on `main`.
 
 ## 2) Doing Now
 
-- Updating documentation and committing the new frame-based worker slice.
-- Next execution step: Phase 1 MediaPipe Pose refinement over the current frame-proxy pipeline.
+- Updating documentation and committing the MediaPipe Pose worker integration slice.
+- Next execution step: browser integration validation and final Phase 1 closure items.
 
 ## 3) Remaining
 
 ### Phase 1 remaining items (from implementation plan)
 
-- Add MediaPipe Pose integration on top of current frame-proxy worker.
-- Refine gaze/head-orientation scoring using landmark-derived features (keep honest fallback when unavailable).
+- Run browser-level integration validation for signaling + DataChannel + fallback in one session flow.
+- Finalize Phase 1 completion notes and acceptance evidence.
 - Add first browser-to-backend integration validation focused on signaling + score path in one flow.
 - Add/expand docs reflecting final Phase 1 transport behavior and acceptance criteria evidence.
 
@@ -65,14 +66,14 @@ Most recent execution sequence:
 ```powershell
 git status --short
 Get-Content -Path client/src/workers/PoseGazeWorker.ts
-Get-Content -Path client/tests/fusion.test.ts
-Get-Content -Path progress/LIVE_EXECUTION_TRACKER.md
-Get-Content -Path client/package.json
-Get-Content -Path client/README.md
-rg -n "PoseGazeWorker|MediaPipe|pose" client/src client/tests docs -S
+Get-Content -Path client/tsconfig.json
+Get-Content -Path client/src/vite-env.d.ts
 npm.cmd test
 npm.cmd run build
-conda run -n proctor python -m pytest
+npm.cmd ls @mediapipe/pose @tensorflow-models/pose-detection
+Get-Content -Path node_modules/@mediapipe/pose/index.d.ts -TotalCount 120
+npm.cmd test
+npm.cmd run build
 ```
 
 ## 5) Update Rule
