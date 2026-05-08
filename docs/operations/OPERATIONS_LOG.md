@@ -182,3 +182,19 @@ This document records what changed, why it changed, and how it was performed. Co
 - Why: keep the implementation documentation aligned with the verified Conda/Docker setup and database-backed backend behavior.
 - How: edited project documentation after all dependency and implementation checks passed.
 - Result: the next phases can start from the current, verified environment state.
+
+## 2026-05-09: Phase 0 Gate Re-Verification And Phase 1 Redis Cache Slice
+
+### Operation 26: Phase 0 Re-Verification Gate
+
+- What changed: no repository content changed.
+- Why: proceed with Phase 1 implementation only after confirming all readiness dependencies and services are healthy.
+- How: verified Conda and `proctor` runtime, re-ran `pip check`, validated Docker Compose PostgreSQL and Redis container status, and re-ran backend/client test and build checks.
+- Result: readiness gate passed with backend tests passing, client tests/build passing, and required services running.
+
+### Operation 27: Redis Session Cache Integration
+
+- What changed: added Redis-backed session summary cache wiring for anomaly-score summary reads, invalidation on new score ingestion, and cache-focused backend tests.
+- Why: complete the planned Phase 1 basic Redis session cache task and reduce repeated database summary reads.
+- How: initialized Redis in app lifespan, added `SessionCache` service, updated API dependencies/routes for read-through/write-through cache flow, and added cache invalidation test coverage.
+- Result: `/api/v1/anomaly-scores/{session_id}` now uses Redis caching with invalidation on writes; backend tests pass with cache behavior verified.

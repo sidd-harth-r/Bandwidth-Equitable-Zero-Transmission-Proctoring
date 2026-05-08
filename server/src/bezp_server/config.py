@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     database_url: str | None = None
     redis_host: str = "localhost"
     redis_port: int = 6379
+    redis_db: int = 0
+    redis_session_summary_ttl_seconds: int = 300
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 

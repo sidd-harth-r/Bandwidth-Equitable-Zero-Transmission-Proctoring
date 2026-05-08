@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from redis import Redis
 
 from bezp_server.api.routes import anomaly_scores, health
 from bezp_server.config import get_settings
@@ -16,8 +17,15 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.database = database
+        app.state.redis = Redis(
+            host=settings.redis_host,
+            port=settings.redis_port,
+            db=settings.redis_db,
+            decode_responses=True,
+        )
         database.initialize()
         yield
+        app.state.redis.close()
 
     app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
 

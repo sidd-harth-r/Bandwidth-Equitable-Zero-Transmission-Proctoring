@@ -6,5 +6,6 @@
 - Verified Docker Engine, Docker Compose, PostgreSQL/TimescaleDB, and Redis.
 - Added FastAPI app factory, health endpoint, anomaly-score ingestion endpoint, in-memory store, and pytest coverage.
 - Replaced anomaly-score in-memory storage with PostgreSQL persistence through SQLAlchemy.
+- Added Redis-backed session summary caching with invalidation on anomaly-score writes.
 - Added Vite TypeScript client app, fusion engine, tier classifier, IndexedDB store, anomaly-score HTTP client, placeholder pose/gaze worker, and Vitest coverage.
 - Verified backend tests, client tests, client build, `pip check`, and npm audit.
