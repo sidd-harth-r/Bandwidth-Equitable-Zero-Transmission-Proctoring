@@ -331,3 +331,10 @@ This document records what changed, why it changed, and how it was performed. Co
   - `npm.cmd test`
   - `npm.cmd run build`
 - Result: build-blocking package/export mismatch was resolved by switching to direct MediaPipe API integration and the client checks passed.
+
+### Operation 40: Manual Browser Session Validation
+
+- What changed: no source code changed during the manual validation step itself; validation evidence was captured and documented.
+- Why: Phase 1 acceptance requires a real webcam-enabled browser run beyond automated tests.
+- How: launched backend and frontend dev servers, opened `http://127.0.0.1:5173`, started a session with webcam permission, observed live score payload updates, and verified runtime transport status in UI.
+- Result: runtime path verified with live anomaly score output and status text `Sent tier_3 (HTTP fallback)`, confirming worker scoring + local persistence + backend fallback ingestion in a real session.

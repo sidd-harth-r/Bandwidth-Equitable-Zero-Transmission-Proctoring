@@ -39,7 +39,7 @@ app.innerHTML = `
     <header>
       <p class="eyebrow">BEZP Phase 1</p>
       <h1>Local Anomaly Score Slice</h1>
-      <p class="summary">Pose/gaze placeholder scoring runs in a Web Worker, stores locally, and posts derived scores to the Phase 1 API.</p>
+      <p class="summary">Pose/gaze scoring runs from camera frames in a Web Worker, stores locally, and sends derived scores over DataChannel with HTTP fallback.</p>
     </header>
     <div class="panel">
       <button id="start" type="button">Start Session</button>

@@ -1,8 +1,8 @@
 # Current Status
 
-## 2026-05-08
+## 2026-05-09
 
-Foundation documentation and repository structure have been created. Phase 1 implementation has started with a backend anomaly-score API, PostgreSQL persistence, and a Vite/TypeScript client score slice.
+Phase 1 core vertical slice is operational end-to-end: camera-frame worker scoring, local storage, signaling/DataChannel transport path, and backend ingestion with PostgreSQL persistence.
 
 ## Working
 
@@ -14,13 +14,12 @@ Foundation documentation and repository structure have been created. Phase 1 imp
 - Client dependencies installed through `npm.cmd install`.
 - FastAPI health endpoint and anomaly-score ingestion endpoint.
 - PostgreSQL-backed anomaly event persistence through SQLAlchemy.
-- Client fusion engine, tier classifier, placeholder pose/gaze worker, IndexedDB store, and HTTP score sender.
+- Client fusion engine, tier classifier, camera-frame + MediaPipe pose worker path with fallback, IndexedDB store, and DataChannel-first score sender with HTTP fallback.
 - Backend and client tests, client build, pip integrity check, and npm audit passing.
+- Manual browser run with webcam permission confirmed live score emission and HTTP fallback status updates.
 
 ## In Progress
 
-- Replace placeholder pose/gaze worker with MediaPipe Pose.
-- Replace HTTP score fallback with WebRTC DataChannel path.
 - Add Alembic migrations for the database schema.
 - Add Redis-backed session state and rate limiting.
 
@@ -32,6 +31,5 @@ Foundation documentation and repository structure have been created. Phase 1 imp
 
 ## Next
 
-- Wire MediaPipe Pose into `PoseGazeWorker`.
-- Add WebRTC signaling and unreliable DataChannel score transport.
 - Add Alembic migrations and Redis-backed live session state.
+- Add explicit session-level integration report artifacts for Phase 1 acceptance evidence.
