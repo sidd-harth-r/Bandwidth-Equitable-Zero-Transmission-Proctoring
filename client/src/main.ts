@@ -3,6 +3,7 @@ import { TierClassifier } from "./coordinator/TierClassifier";
 import type { AnomalyScorePayload, WorkerScoreMessage } from "./coordinator/types";
 import { AnomalyScoreClient } from "./network/AnomalyScoreClient";
 import { SignalingClient } from "./network/SignalingClient";
+import { startWebRtcSignaling, type WebRtcSession } from "./network/WebRtcSignaling";
 import { SessionStore } from "./storage/SessionStore";
 
 import "./styles.css";
@@ -22,6 +23,7 @@ const store = new SessionStore();
 const client = new AnomalyScoreClient();
 const signaling = new SignalingClient();
 let worker: Worker | undefined;
+let webRtcSession: WebRtcSession | undefined;
 
 app.innerHTML = `
   <section class="shell">
@@ -46,8 +48,12 @@ const latest = document.querySelector<HTMLPreElement>("#latest");
 
 startButton?.addEventListener("click", async () => {
   await requestCameraIfAvailable();
-  await sendSignalingOffer();
-  void pollForSignalingAnswer();
+  webRtcSession = await startWebRtcSignaling(signaling, {
+    sessionId,
+    studentId,
+    proctorId
+  });
+  void updateSignalingStatus(webRtcSession);
   worker = new Worker(new URL("./workers/PoseGazeWorker.ts", import.meta.url), {
     type: "module"
   });
@@ -63,7 +69,9 @@ startButton?.addEventListener("click", async () => {
 stopButton?.addEventListener("click", () => {
   worker?.postMessage({ type: "stop" });
   worker?.terminate();
+  webRtcSession?.peer.close();
   worker = undefined;
+  webRtcSession = undefined;
   if (startButton) startButton.disabled = false;
   if (stopButton) stopButton.disabled = true;
   if (status) status.textContent = "Stopped";
@@ -113,24 +121,10 @@ async function requestCameraIfAvailable(): Promise<void> {
   }
 }
 
-async function sendSignalingOffer(): Promise<void> {
-  const offer = {
-    type: "offer",
-    sdp: "phase1-placeholder-sdp"
-  };
-  await signaling.enqueueSignal({
-    session_id: sessionId,
-    sender_id: studentId,
-    target_id: proctorId,
-    signal_type: "offer",
-    payload: JSON.stringify(offer)
-  });
-}
-
-async function pollForSignalingAnswer(): Promise<void> {
+async function updateSignalingStatus(session: WebRtcSession): Promise<void> {
   try {
-    const answer = await signaling.dequeueSignal(sessionId, studentId, "answer");
-    if (answer && status) {
+    const answered = await session.waitForAnswer;
+    if (answered && status) {
       status.textContent = "Signaling answer received";
     }
   } catch {

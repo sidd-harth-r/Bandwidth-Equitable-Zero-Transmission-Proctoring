@@ -240,3 +240,26 @@ This document records what changed, why it changed, and how it was performed. Co
   - `npm.cmd run build`
   - `conda run -n proctor python -m pytest`
 - Result: client signaling changes are verified with `vitest`, frontend build, and backend regression tests all passing.
+
+### Operation 32: RTCPeerConnection Offer And ICE Wiring
+
+- What changed: replaced placeholder offer payload creation with real `RTCPeerConnection` offer generation, local description enqueue, ICE candidate enqueue, answer polling, and remote answer application support.
+- Why: continue Phase 1 toward the intended WebRTC signaling and DataChannel path with browser-native signaling primitives.
+- How: added `WebRtcSignaling` module with `startWebRtcSignaling`, integrated it into `client/src/main.ts`, and added unit tests with a fake peer to validate offer enqueue and answer application behavior.
+- Result: the client now creates a real WebRTC offer and emits ICE candidates through the signaling API path while retaining resilient non-blocking startup behavior.
+
+### Operation 33: Command Trace For RTCPeerConnection Slice
+
+- What changed: no repository content changed.
+- Why: preserve an exact record of the executed verification flow.
+- How: executed the following commands:
+  - `git status --short`
+  - `Get-Content -Path client/src/main.ts`
+  - `Get-Content -Path client/src/network/SignalingClient.ts`
+  - `Get-Content -Path client/tests/signaling.test.ts`
+  - `npm.cmd test`
+  - `npm.cmd run build`
+  - `conda run -n proctor python -m pytest`
+  - `npm.cmd test`
+  - `npm.cmd run build`
+- Result: frontend tests and build passed after typing contract fix; backend regressions also passed.
