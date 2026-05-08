@@ -20,6 +20,7 @@ Phase 1 core vertical slice is operational end-to-end: camera-frame worker scori
 - Live datapoint panel now shows frame-derived metrics (`centerX`, `centerY`, `motion`, `brightness`, `brightnessShift`) and landmark coordinates when MediaPipe path is active.
 - Backend CORS now supports dynamic local Vite ports (`localhost`/`127.0.0.1`) to prevent false API-unavailable states in browser sessions.
 - Signaling backend now uses Redis queue semantics to avoid overwriting offer/ICE messages under burst conditions.
+- Local DataChannel-open path is now verified with runtime diagnostics (`datachannel_open`, `connected` ICE states, and remote ICE candidate ingestion).
 
 ## In Progress
 

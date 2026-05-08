@@ -145,3 +145,13 @@ pre {
   padding: 8px;
   box-sizing: border-box;
 }
+
+#webrtc-debug {
+  width: min(100%, 900px);
+  min-height: 120px;
+  margin: 0;
+  border: 1px solid #d5dde3;
+  border-radius: 6px;
+  background: #f7fafc;
+  color: #1d2a32;
+}

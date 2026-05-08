@@ -98,7 +98,7 @@ describe("startWebRtcSignaling", () => {
     const answered = await pending;
 
     expect(answered).toBe(false);
-    expect(dequeueSignal).toHaveBeenCalledTimes(5);
+    expect(dequeueSignal).toHaveBeenCalledTimes(20);
     vi.useRealTimers();
   });
 

@@ -16,6 +16,14 @@ interface SignalAck {
 
 export class SignalingClient {
   constructor(private readonly baseUrl = "http://localhost:8000/api/v1") {}
+  private lastDequeueTrace: {
+    sessionId: string;
+    targetId: string;
+    signalType: SignalType;
+    url: string;
+    status: number | "network_error";
+    at: string;
+  } | null = null;
 
   async enqueueSignal(signal: SignalEnvelope): Promise<SignalAck> {
     const response = await fetch(`${this.baseUrl}/signaling`, {
@@ -36,12 +44,29 @@ export class SignalingClient {
     targetId: string,
     signalType: SignalType
   ): Promise<SignalEnvelope | null> {
+    const url = `${this.baseUrl}/signaling/${sessionId}/${targetId}/${signalType}`;
     let response: Response;
     try {
-      response = await fetch(`${this.baseUrl}/signaling/${sessionId}/${targetId}/${signalType}`);
+      response = await fetch(url);
     } catch {
+      this.lastDequeueTrace = {
+        sessionId,
+        targetId,
+        signalType,
+        url,
+        status: "network_error",
+        at: new Date().toISOString()
+      };
       return null;
     }
+    this.lastDequeueTrace = {
+      sessionId,
+      targetId,
+      signalType,
+      url,
+      status: response.status,
+      at: new Date().toISOString()
+    };
     if (response.status === 404) {
       return null;
     }
@@ -49,5 +74,18 @@ export class SignalingClient {
       throw new Error(`Failed to dequeue signaling message: ${response.status}`);
     }
     return (await response.json()) as SignalEnvelope;
+  }
+
+  getLastDequeueTrace():
+    | {
+        sessionId: string;
+        targetId: string;
+        signalType: SignalType;
+        url: string;
+        status: number | "network_error";
+        at: string;
+      }
+    | null {
+    return this.lastDequeueTrace;
   }
 }

@@ -19,9 +19,9 @@ if (!app) {
   throw new Error("Missing #app root");
 }
 
-const sessionId = `session-${crypto.randomUUID()}`;
 const studentId = "local-demo-student";
 const proctorId = "local-demo-proctor";
+let activeSessionId = `session-${crypto.randomUUID()}`;
 const fusionEngine = new FusionEngine();
 const tierClassifier = new TierClassifier();
 const store = new SessionStore();
@@ -53,6 +53,7 @@ app.innerHTML = `
       <span id="status">Idle</span>
       <span id="dc-status">DataChannel: not-started</span>
     </div>
+    <pre id="webrtc-debug">WebRTC: waiting</pre>
     <section class="telemetry">
       <article class="camera-panel">
         <h2>Camera Feed</h2>
@@ -78,6 +79,7 @@ const startButton = document.querySelector<HTMLButtonElement>("#start");
 const stopButton = document.querySelector<HTMLButtonElement>("#stop");
 const status = document.querySelector<HTMLSpanElement>("#status");
 const dcStatus = document.querySelector<HTMLSpanElement>("#dc-status");
+const webrtcDebug = document.querySelector<HTMLPreElement>("#webrtc-debug");
 const latest = document.querySelector<HTMLPreElement>("#latest");
 const cameraState = document.querySelector<HTMLParagraphElement>("#camera-state");
 const liveDatapoints = document.querySelector<HTMLPreElement>("#live-datapoints");
@@ -87,19 +89,23 @@ const cameraFeed = document.querySelector<HTMLVideoElement>("#camera-feed");
 const cameraOverlay = document.querySelector<HTMLCanvasElement>("#camera-overlay");
 
 startButton?.addEventListener("click", async () => {
+  activeSessionId = `session-${crypto.randomUUID()}`;
+  sentEventCount = 0;
+  dataChannelSentCount = 0;
   try {
     await startCameraCapture();
     loopbackHandle = startLocalProctorLoopback(signaling, {
-      sessionId,
+      sessionId: activeSessionId,
       studentId,
       proctorId
     });
     webRtcSession = await startWebRtcSignaling(signaling, {
-      sessionId,
+      sessionId: activeSessionId,
       studentId,
       proctorId
     });
     bindDataChannelStatus(webRtcSession.dataChannel);
+    bindPeerDiagnostics(webRtcSession);
     void updateSignalingStatus(webRtcSession);
   } catch {
     if (status) {
@@ -144,7 +150,7 @@ async function handleWorkerScore(message: WorkerScoreMessage): Promise<void> {
   });
   const payload: AnomalyScorePayload = {
     ...fusion,
-    session_id: sessionId,
+    session_id: activeSessionId,
     student_id: studentId,
     occurred_at: message.sampledAt,
     tier: tierClassifier.classify(fusion),
@@ -397,13 +403,68 @@ function bindDataChannelStatus(channel: {
       if (dcStatus) {
         dcStatus.textContent = `DataChannel: open, sent=${dataChannelSentCount}`;
       }
+      writeWebRtcDebug("datachannel_open");
     });
     channel.addEventListener("close", () => {
       if (dcStatus) {
         dcStatus.textContent = "DataChannel: closed";
       }
+      writeWebRtcDebug("datachannel_closed");
     });
   }
+}
+
+function bindPeerDiagnostics(session: WebRtcSession): void {
+  const rtcPeer = session.peer as RTCPeerConnection;
+  writeWebRtcDebug("signaling_started");
+  if (typeof rtcPeer.addEventListener !== "function") {
+    return;
+  }
+  rtcPeer.addEventListener("iceconnectionstatechange", () => {
+    writeWebRtcDebug("iceconnectionstatechange", session);
+  });
+  rtcPeer.addEventListener("connectionstatechange", () => {
+    writeWebRtcDebug("connectionstatechange", session);
+  });
+  rtcPeer.addEventListener("signalingstatechange", () => {
+    writeWebRtcDebug("signalingstatechange", session);
+  });
+  rtcPeer.addEventListener("icegatheringstatechange", () => {
+    writeWebRtcDebug("icegatheringstatechange", session);
+  });
+}
+
+function writeWebRtcDebug(eventName: string, session?: WebRtcSession): void {
+  if (!webrtcDebug) {
+    return;
+  }
+  const rtcPeer = (session?.peer ?? webRtcSession?.peer) as RTCPeerConnection | undefined;
+  const payload = {
+    event: eventName,
+    at: new Date().toISOString(),
+    dc_state: webRtcSession?.dataChannel.readyState ?? "none",
+    sent_via_dc: dataChannelSentCount,
+    answer_received: session?.diagnostics.answerReceived ?? webRtcSession?.diagnostics.answerReceived ?? false,
+    answer_payload_size:
+      session?.diagnostics.answerPayloadSize ?? webRtcSession?.diagnostics.answerPayloadSize ?? 0,
+    answer_parse_ok: session?.diagnostics.answerParseOk ?? webRtcSession?.diagnostics.answerParseOk ?? false,
+    set_remote_description_error:
+      session?.diagnostics.setRemoteDescriptionError ??
+      webRtcSession?.diagnostics.setRemoteDescriptionError ??
+      null,
+    local_ice_candidates:
+      session?.diagnostics.localIceCandidates ?? webRtcSession?.diagnostics.localIceCandidates ?? 0,
+    remote_ice_candidates:
+      session?.diagnostics.remoteIceCandidates ?? webRtcSession?.diagnostics.remoteIceCandidates ?? 0,
+    peer_connection_state: rtcPeer?.connectionState ?? "n/a",
+    peer_ice_connection_state: rtcPeer?.iceConnectionState ?? "n/a",
+    peer_ice_gathering_state: rtcPeer?.iceGatheringState ?? "n/a",
+    peer_signaling_state: rtcPeer?.signalingState ?? "n/a",
+    loopback: loopbackHandle?.getDiagnostics ? loopbackHandle.getDiagnostics() : null
+    ,
+    signaling_last_dequeue: signaling.getLastDequeueTrace()
+  };
+  webrtcDebug.textContent = JSON.stringify(payload, null, 2);
 }
 
 async function updateSignalingStatus(session: WebRtcSession): Promise<void> {
@@ -411,6 +472,7 @@ async function updateSignalingStatus(session: WebRtcSession): Promise<void> {
     const answered = await session.waitForAnswer;
     if (answered && status) {
       status.textContent = "Signaling answer received";
+      writeWebRtcDebug("answer_applied", session);
     }
   } catch {
     if (status) {

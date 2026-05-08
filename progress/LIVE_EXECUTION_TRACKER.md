@@ -32,11 +32,10 @@ This file is the single live status board for implementation.
 
 ## 2) Doing Now
 
-- Manual verification run for explicit DataChannel state indicator (`DataChannel: open, sent=n`).
+- Phase 1 closure documentation and push.
 
 ## 3) Remaining
 
-- Re-run manual browser check to confirm `Sent ... (DataChannel)` status appears in UI with loopback responder.
 - Move to post-Phase-1 tasks:
   - Alembic migrations
   - Redis-backed live session state/rate limiting
@@ -50,6 +49,14 @@ This file is the single live status board for implementation.
 - `client UI runtime indicator`
   - Added `DataChannel: ...` live state text in toolbar.
   - Increments send counter when payload is transmitted over DataChannel.
+  - Verified with runtime debug event: `datachannel_open`.
+
+- `WebRTC debug proof`
+  - Confirmed answer application and connected state in local loopback:
+    - `answer_received: true`
+    - `peer_connection_state: connected`
+    - `peer_ice_connection_state: connected`
+    - `remote_ice_candidates: 1`
 
 ## 4) Exact Command Trace (Recent)
 

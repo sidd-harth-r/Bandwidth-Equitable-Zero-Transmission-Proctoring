@@ -343,6 +343,13 @@ This document records what changed, why it changed, and how it was performed. Co
 
 - What changed: added a local answering peer loopback flow and student-side remote ICE ingestion to support DataChannel-open validation in a single local environment.
 
+### Operation 42: DataChannel Diagnostic Instrumentation And Closure
+
+- What changed: added deep client-side WebRTC diagnostics (peer/signaling/ICE/datachannel states, answer parse/apply diagnostics, loopback diagnostics, signaling dequeue trace), stabilized local loopback negotiation by waiting for ICE gather completion before sending offer/answer SDP, and extended polling timing to avoid early candidate miss.
+- Why: repeated runs showed `DataChannel: connecting` despite successful offer/answer exchange; exact runtime telemetry was needed to locate and resolve the remaining negotiation timing issue.
+- How: updated `client/src/network/WebRtcSignaling.ts`, `client/src/network/LocalProctorLoopback.ts`, `client/src/network/SignalingClient.ts`, `client/src/main.ts`, `client/src/styles.css`, and `client/tests/webrtc-signaling.test.ts`; iteratively validated with user-shared runtime debug JSON plus `npm.cmd test` and `npm.cmd run build`.
+- Result: DataChannel-open path confirmed in runtime with `event: datachannel_open`, `answer_received: true`, `peer_connection_state: connected`, `peer_ice_connection_state: connected`, and `remote_ice_candidates: 1`.
+
 ## 2026-05-08: Phase 1 Runtime Reliability And Live Datapoints Visibility
 
 ### Operation 34: Live Webcam Datapoints Surface

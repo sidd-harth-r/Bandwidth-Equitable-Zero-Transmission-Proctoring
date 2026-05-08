@@ -8,6 +8,11 @@ interface SessionIds {
 
 export interface LoopbackHandle {
   stop(): void;
+  getDiagnostics(): {
+    offerApplied: boolean;
+    answerQueued: boolean;
+    errors: string[];
+  };
 }
 
 export function startLocalProctorLoopback(
@@ -15,10 +20,12 @@ export function startLocalProctorLoopback(
   ids: SessionIds
 ): LoopbackHandle {
   const peer = new RTCPeerConnection({
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+    iceServers: []
   });
   let running = true;
   let offerApplied = false;
+  let answerQueued = false;
+  const errors: string[] = [];
   let timer: ReturnType<typeof setInterval> | undefined;
 
   peer.onicecandidate = (event) => {
@@ -42,7 +49,10 @@ export function startLocalProctorLoopback(
   };
 
   timer = setInterval(() => {
-    void pumpSignals();
+    void pumpSignals().catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(message);
+    });
   }, 300);
 
   async function pumpSignals(): Promise<void> {
@@ -53,24 +63,42 @@ export function startLocalProctorLoopback(
     if (!offerApplied) {
       const offerSignal = await signaling.dequeueSignal(ids.sessionId, ids.proctorId, "offer");
       if (offerSignal) {
-        const offer = JSON.parse(offerSignal.payload) as RTCSessionDescriptionInit;
-        await peer.setRemoteDescription(offer);
-        offerApplied = true;
-        const answer = await peer.createAnswer();
-        await peer.setLocalDescription(answer);
-        await signaling.enqueueSignal({
-          session_id: ids.sessionId,
-          sender_id: ids.proctorId,
-          target_id: ids.studentId,
-          signal_type: "answer",
-          payload: JSON.stringify(answer)
-        });
+        try {
+          const offer = JSON.parse(offerSignal.payload) as RTCSessionDescriptionInit;
+          await peer.setRemoteDescription(offer);
+          offerApplied = true;
+          const answer = await peer.createAnswer();
+          await peer.setLocalDescription(answer);
+          await waitForIceGatheringComplete(peer);
+          const localDescription = peer.localDescription;
+          if (!localDescription) {
+            throw new Error("loopback_local_description_missing_after_answer");
+          }
+          await signaling.enqueueSignal({
+            session_id: ids.sessionId,
+            sender_id: ids.proctorId,
+            target_id: ids.studentId,
+            signal_type: "answer",
+            payload: JSON.stringify(localDescription)
+          });
+          answerQueued = true;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          errors.push(`loopback_offer_apply_or_answer_failed:${message}`);
+        }
       }
     }
 
     if (offerApplied) {
-      const candidateSignal = await signaling.dequeueSignal(ids.sessionId, ids.proctorId, "ice_candidate");
-      if (candidateSignal) {
+      for (let i = 0; i < 5; i += 1) {
+        const candidateSignal = await signaling.dequeueSignal(
+          ids.sessionId,
+          ids.proctorId,
+          "ice_candidate"
+        );
+        if (!candidateSignal) {
+          break;
+        }
         try {
           const candidate = JSON.parse(candidateSignal.payload) as RTCIceCandidateInit;
           await peer.addIceCandidate(candidate);
@@ -89,6 +117,35 @@ export function startLocalProctorLoopback(
         timer = undefined;
       }
       peer.close();
+    },
+    getDiagnostics() {
+      return {
+        offerApplied,
+        answerQueued,
+        errors: [...errors]
+      };
     }
   };
+}
+
+async function waitForIceGatheringComplete(peer: RTCPeerConnection): Promise<void> {
+  if (peer.iceGatheringState === "complete") {
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      peer.removeEventListener("icegatheringstatechange", onStateChange);
+      resolve();
+    };
+    const onStateChange = () => {
+      if (peer.iceGatheringState === "complete") {
+        finish();
+      }
+    };
+    peer.addEventListener("icegatheringstatechange", onStateChange);
+    setTimeout(finish, 2500);
+  });
 }

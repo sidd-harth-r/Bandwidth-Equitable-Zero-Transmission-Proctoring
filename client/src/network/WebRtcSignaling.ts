@@ -21,6 +21,14 @@ export interface WebRtcSession {
   peer: PeerConnectionLike;
   dataChannel: DataChannelLike;
   waitForAnswer: Promise<boolean>;
+  diagnostics: {
+    localIceCandidates: number;
+    remoteIceCandidates: number;
+    answerReceived: boolean;
+    answerPayloadSize: number;
+    answerParseOk: boolean;
+    setRemoteDescriptionError: string | null;
+  };
 }
 
 interface SessionIds {
@@ -42,9 +50,17 @@ export async function startWebRtcSignaling(
   signaling: SignalingTransport,
   ids: SessionIds,
   peer: PeerConnectionLike = new RTCPeerConnection({
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+    iceServers: []
   })
 ): Promise<WebRtcSession> {
+  const diagnostics = {
+    localIceCandidates: 0,
+    remoteIceCandidates: 0,
+    answerReceived: false,
+    answerPayloadSize: 0,
+    answerParseOk: false,
+    setRemoteDescriptionError: null as string | null
+  };
   const dataChannel = peer.createDataChannel("anomaly-scores", {
     ordered: false,
     maxRetransmits: 0
@@ -54,6 +70,7 @@ export async function startWebRtcSignaling(
     if (!event.candidate) {
       return;
     }
+    diagnostics.localIceCandidates += 1;
     void signaling.enqueueSignal({
       session_id: ids.sessionId,
       sender_id: ids.studentId,
@@ -65,6 +82,7 @@ export async function startWebRtcSignaling(
 
   const offer = await peer.createOffer();
   await peer.setLocalDescription(offer);
+  await waitForIceGatheringComplete(peer);
   const localDescription = peer.localDescription;
   if (!localDescription) {
     throw new Error("RTCPeerConnection local description missing after offer creation.");
@@ -81,39 +99,89 @@ export async function startWebRtcSignaling(
   return {
     peer,
     dataChannel,
-    waitForAnswer: waitForAnswer(signaling, ids, peer)
+    waitForAnswer: waitForAnswer(signaling, ids, peer, diagnostics),
+    diagnostics
   };
 }
 
 async function waitForAnswer(
   signaling: SignalingTransport,
   ids: SessionIds,
-  peer: PeerConnectionLike
+  peer: PeerConnectionLike,
+  diagnostics: {
+    localIceCandidates: number;
+    remoteIceCandidates: number;
+    answerReceived: boolean;
+    answerPayloadSize: number;
+    answerParseOk: boolean;
+    setRemoteDescriptionError: string | null;
+  }
 ): Promise<boolean> {
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
     const signal = await signaling.dequeueSignal(ids.sessionId, ids.studentId, "answer");
     if (!signal) {
-      await delay(600);
+      await delay(250);
       continue;
     }
-    await applyRemoteAnswer(peer, signal);
-    await ingestRemoteIce(signaling, ids, peer);
+    const applied = await applyRemoteAnswer(peer, signal, diagnostics);
+    if (!applied) {
+      return false;
+    }
+    diagnostics.answerReceived = true;
+    void ingestRemoteIce(signaling, ids, peer, diagnostics);
     return true;
   }
   return false;
 }
 
-async function applyRemoteAnswer(peer: PeerConnectionLike, signal: SignalEnvelope): Promise<void> {
-  const answer = JSON.parse(signal.payload) as RTCSessionDescriptionInit;
-  await peer.setRemoteDescription(answer);
+async function applyRemoteAnswer(
+  peer: PeerConnectionLike,
+  signal: SignalEnvelope,
+  diagnostics: {
+    localIceCandidates: number;
+    remoteIceCandidates: number;
+    answerReceived: boolean;
+    answerPayloadSize: number;
+    answerParseOk: boolean;
+    setRemoteDescriptionError: string | null;
+  }
+): Promise<boolean> {
+  diagnostics.answerPayloadSize = signal.payload.length;
+  let answer: RTCSessionDescriptionInit;
+  try {
+    answer = JSON.parse(signal.payload) as RTCSessionDescriptionInit;
+    diagnostics.answerParseOk = true;
+  } catch (error) {
+    diagnostics.answerParseOk = false;
+    diagnostics.setRemoteDescriptionError =
+      error instanceof Error ? `answer_parse_failed:${error.message}` : "answer_parse_failed";
+    return false;
+  }
+  try {
+    await peer.setRemoteDescription(answer);
+    diagnostics.setRemoteDescriptionError = null;
+    return true;
+  } catch (error) {
+    diagnostics.setRemoteDescriptionError =
+      error instanceof Error ? error.message : "set_remote_description_failed";
+    return false;
+  }
 }
 
 async function ingestRemoteIce(
   signaling: SignalingTransport,
   ids: SessionIds,
-  peer: PeerConnectionLike
+  peer: PeerConnectionLike,
+  diagnostics: {
+    localIceCandidates: number;
+    remoteIceCandidates: number;
+    answerReceived: boolean;
+    answerPayloadSize: number;
+    answerParseOk: boolean;
+    setRemoteDescriptionError: string | null;
+  }
 ): Promise<void> {
-  for (let attempt = 0; attempt < 6; attempt += 1) {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
     const signal = await signaling.dequeueSignal(ids.sessionId, ids.studentId, "ice_candidate");
     if (!signal) {
       await delay(250);
@@ -122,8 +190,9 @@ async function ingestRemoteIce(
     try {
       const candidate = JSON.parse(signal.payload) as RTCIceCandidateInit;
       await peer.addIceCandidate(candidate);
+      diagnostics.remoteIceCandidates += 1;
     } catch {
-      return;
+      // Keep polling even if one candidate is malformed.
     }
   }
 }
@@ -131,6 +200,33 @@ async function ingestRemoteIce(
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
+  });
+}
+
+async function waitForIceGatheringComplete(peer: PeerConnectionLike): Promise<void> {
+  const rtcPeer = peer as RTCPeerConnection;
+  if (typeof rtcPeer.addEventListener !== "function") {
+    return;
+  }
+  if (rtcPeer.iceGatheringState === "complete") {
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      rtcPeer.removeEventListener("icegatheringstatechange", onStateChange);
+      resolve();
+    };
+    const onStateChange = () => {
+      if (rtcPeer.iceGatheringState === "complete") {
+        finish();
+      }
+    };
+    rtcPeer.addEventListener("icegatheringstatechange", onStateChange);
+    setTimeout(finish, 2500);
   });
 }
 
