@@ -219,3 +219,24 @@ This document records what changed, why it changed, and how it was performed. Co
   - `npm.cmd test`
   - `npm.cmd run build`
 - Result: dependencies/services verified and the signaling backend slice validated with passing tests.
+
+### Operation 30: Client Signaling Transport Wiring
+
+- What changed: added a client signaling transport module, integrated signaling offer/answer API calls into the Phase 1 app flow, and added client-side signaling tests.
+- Why: continue Phase 1 by moving from backend-only signaling endpoints to an end-to-end client transport path that can later be replaced with real RTCPeerConnection wiring.
+- How: added `SignalingClient` with enqueue/dequeue methods, invoked offer enqueue on session start with non-blocking answer poll, and added Vitest coverage for queue and not-found behavior.
+- Result: client now executes the signaling API skeleton path during session startup, and frontend/backend tests pass.
+
+### Operation 31: Command Trace For Client Signaling Slice
+
+- What changed: no repository content changed.
+- Why: maintain an exact execution record while continuing Phase 1 implementation.
+- How: executed the following commands:
+  - `git status --short`
+  - `Get-Content client/src/network/AnomalyScoreClient.ts`
+  - `Get-Content client/src/main.ts`
+  - `rg -n "network|signaling|webrtc|anomaly" client/src client/tests -S`
+  - `npm.cmd test`
+  - `npm.cmd run build`
+  - `conda run -n proctor python -m pytest`
+- Result: client signaling changes are verified with `vitest`, frontend build, and backend regression tests all passing.

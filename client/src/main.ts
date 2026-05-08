@@ -2,6 +2,7 @@ import { FusionEngine } from "./coordinator/FusionEngine";
 import { TierClassifier } from "./coordinator/TierClassifier";
 import type { AnomalyScorePayload, WorkerScoreMessage } from "./coordinator/types";
 import { AnomalyScoreClient } from "./network/AnomalyScoreClient";
+import { SignalingClient } from "./network/SignalingClient";
 import { SessionStore } from "./storage/SessionStore";
 
 import "./styles.css";
@@ -14,10 +15,12 @@ if (!app) {
 
 const sessionId = `session-${crypto.randomUUID()}`;
 const studentId = "local-demo-student";
+const proctorId = "local-demo-proctor";
 const fusionEngine = new FusionEngine();
 const tierClassifier = new TierClassifier();
 const store = new SessionStore();
 const client = new AnomalyScoreClient();
+const signaling = new SignalingClient();
 let worker: Worker | undefined;
 
 app.innerHTML = `
@@ -43,6 +46,8 @@ const latest = document.querySelector<HTMLPreElement>("#latest");
 
 startButton?.addEventListener("click", async () => {
   await requestCameraIfAvailable();
+  await sendSignalingOffer();
+  void pollForSignalingAnswer();
   worker = new Worker(new URL("./workers/PoseGazeWorker.ts", import.meta.url), {
     type: "module"
   });
@@ -105,5 +110,32 @@ async function requestCameraIfAvailable(): Promise<void> {
   const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
   for (const track of stream.getTracks()) {
     track.stop();
+  }
+}
+
+async function sendSignalingOffer(): Promise<void> {
+  const offer = {
+    type: "offer",
+    sdp: "phase1-placeholder-sdp"
+  };
+  await signaling.enqueueSignal({
+    session_id: sessionId,
+    sender_id: studentId,
+    target_id: proctorId,
+    signal_type: "offer",
+    payload: JSON.stringify(offer)
+  });
+}
+
+async function pollForSignalingAnswer(): Promise<void> {
+  try {
+    const answer = await signaling.dequeueSignal(sessionId, studentId, "answer");
+    if (answer && status) {
+      status.textContent = "Signaling answer received";
+    }
+  } catch {
+    if (status) {
+      status.textContent = "Running";
+    }
   }
 }
