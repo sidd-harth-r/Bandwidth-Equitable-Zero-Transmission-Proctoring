@@ -16,7 +16,7 @@ Do not transmit raw continuous video from this application.
 
 ## Phase 1 Status
 
-The current client contains a Vite/TypeScript shell with a pose/gaze placeholder worker. It produces derived numerical scores only, stores them in IndexedDB, and posts them to the Phase 1 backend fallback endpoint.
+The current client contains a Vite/TypeScript shell with a frame-driven pose/gaze worker pipeline. It produces derived numerical scores only, stores them in IndexedDB, and sends scores over WebRTC DataChannel with HTTP fallback to the Phase 1 backend.
 
 Run locally:
 

@@ -284,3 +284,27 @@ This document records what changed, why it changed, and how it was performed. Co
   - `npm.cmd run build`
   - `conda run -n proctor python -m pytest`
 - Result: frontend tests/build and backend regression tests all passed after DataChannel transport integration.
+
+### Operation 36: Real Camera-Frame Worker Scoring
+
+- What changed: replaced the synthetic pose/gaze placeholder worker loop with real frame-driven scoring and updated client session lifecycle to stream sampled camera frames into the worker.
+- Why: move Phase 1 from synthetic score generation to real-device behavioral signal extraction while preserving privacy-safe derived outputs only.
+- How: implemented frame message handling in `PoseGazeWorker`, added motion/center/brightness proxy scoring, started frame pump after session start, and added stream/pump cleanup on stop.
+- Result: score emission now depends on real camera-frame dynamics instead of synthetic sine-wave values.
+
+### Operation 37: Command Trace For Frame-Driven Worker Slice
+
+- What changed: no repository content changed.
+- Why: preserve exact command visibility while continuing implementation.
+- How: executed the following commands:
+  - `git status --short`
+  - `Get-Content -Path client/src/workers/PoseGazeWorker.ts`
+  - `Get-Content -Path client/tests/fusion.test.ts`
+  - `Get-Content -Path progress/LIVE_EXECUTION_TRACKER.md`
+  - `Get-Content -Path client/package.json`
+  - `Get-Content -Path client/README.md`
+  - `rg -n "PoseGazeWorker|MediaPipe|pose" client/src client/tests docs -S`
+  - `npm.cmd test`
+  - `npm.cmd run build`
+  - `conda run -n proctor python -m pytest`
+- Result: frontend tests/build and backend regression tests passed after integrating frame-driven worker scoring.
