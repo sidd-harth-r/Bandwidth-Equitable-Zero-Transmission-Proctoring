@@ -198,3 +198,24 @@ This document records what changed, why it changed, and how it was performed. Co
 - Why: complete the planned Phase 1 basic Redis session cache task and reduce repeated database summary reads.
 - How: initialized Redis in app lifespan, added `SessionCache` service, updated API dependencies/routes for read-through/write-through cache flow, and added cache invalidation test coverage.
 - Result: `/api/v1/anomaly-scores/{session_id}` now uses Redis caching with invalidation on writes; backend tests pass with cache behavior verified.
+
+### Operation 28: WebRTC Signaling Skeleton
+
+- What changed: added a Phase 1 signaling route skeleton with Redis-backed enqueue/dequeue flow, signaling schemas, route registration, and test coverage.
+- Why: complete the planned `/signaling` Phase 1 task so the project has a concrete backend signaling path for future WebRTC DataChannel wiring.
+- How: implemented `POST /api/v1/signaling` and `GET /api/v1/signaling/{session_id}/{target_id}/{signal_type}` with Redis `setex/get/delete`, added schema models, and added success/invalid-path tests.
+- Result: signaling messages can be queued and consumed through Redis-backed API endpoints; backend tests pass.
+
+### Operation 29: Command Trace For Phase Gate And Signaling Slice
+
+- What changed: no repository content changed.
+- Why: maintain an exact executable trail for the user while advancing Phase 1.
+- How: executed the following commands:
+  - `docker compose -f infrastructure/docker/docker-compose.dev.yml up -d`
+  - `docker compose -f infrastructure/docker/docker-compose.dev.yml ps -a`
+  - `docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"`
+  - `conda run -n proctor python -m pip check`
+  - `conda run -n proctor python -m pytest`
+  - `npm.cmd test`
+  - `npm.cmd run build`
+- Result: dependencies/services verified and the signaling backend slice validated with passing tests.

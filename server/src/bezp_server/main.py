@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from redis import Redis
 
-from bezp_server.api.routes import anomaly_scores, health
+from bezp_server.api.routes import anomaly_scores, health, signaling
 from bezp_server.config import get_settings
 from bezp_server.db.session import Database
 
@@ -39,6 +39,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router, prefix=settings.api_prefix)
     app.include_router(anomaly_scores.router, prefix=settings.api_prefix)
+    app.include_router(signaling.router, prefix=settings.api_prefix)
 
     return app
 

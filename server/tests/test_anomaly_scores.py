@@ -94,6 +94,46 @@ def test_anomaly_score_rejects_raw_frame_metadata() -> None:
         assert response.status_code == 422
 
 
+def test_signaling_enqueue_and_dequeue() -> None:
+    app = create_app()
+    signal = {
+        "session_id": "session-signal-001",
+        "sender_id": "student-001",
+        "target_id": "proctor-001",
+        "signal_type": "offer",
+        "payload": '{"type":"offer","sdp":"fake-sdp"}',
+    }
+
+    with TestClient(app) as client:
+        clear_session_cache(app, "session-signal-001")
+        queued = client.post("/api/v1/signaling", json=signal)
+        fetched = client.get("/api/v1/signaling/session-signal-001/proctor-001/offer")
+        missing = client.get("/api/v1/signaling/session-signal-001/proctor-001/offer")
+
+        assert queued.status_code == 202
+        assert queued.json()["status"] == "queued"
+        assert fetched.status_code == 200
+        assert fetched.json()["payload"] == signal["payload"]
+        assert missing.status_code == 404
+
+
+def test_signaling_rejects_invalid_signal_type() -> None:
+    app = create_app()
+    signal = {
+        "session_id": "session-signal-002",
+        "sender_id": "student-001",
+        "target_id": "proctor-001",
+        "signal_type": "offer",
+        "payload": '{"type":"offer","sdp":"fake-sdp"}',
+    }
+
+    with TestClient(app) as client:
+        client.post("/api/v1/signaling", json=signal)
+        invalid = client.get("/api/v1/signaling/session-signal-002/proctor-001/not-a-type")
+
+        assert invalid.status_code == 422
+
+
 def clear_anomaly_events(app) -> None:
     with app.state.database.session_factory() as db:
         db.execute(delete(AnomalyEvent))
