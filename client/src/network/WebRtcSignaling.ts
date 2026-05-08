@@ -11,6 +11,7 @@ export interface PeerConnectionLike {
   createOffer(): Promise<RTCSessionDescriptionInit>;
   setLocalDescription(description: RTCSessionDescriptionInit): Promise<void>;
   setRemoteDescription(description: RTCSessionDescriptionInit): Promise<void>;
+  addIceCandidate(candidate: RTCIceCandidateInit): Promise<void>;
   createDataChannel(label: string, options?: RTCDataChannelInit): DataChannelLike;
   close(): void;
   onicecandidate: ((event: RTCPeerConnectionIceEvent) => void) | null;
@@ -96,6 +97,7 @@ async function waitForAnswer(
       continue;
     }
     await applyRemoteAnswer(peer, signal);
+    await ingestRemoteIce(signaling, ids, peer);
     return true;
   }
   return false;
@@ -104,6 +106,26 @@ async function waitForAnswer(
 async function applyRemoteAnswer(peer: PeerConnectionLike, signal: SignalEnvelope): Promise<void> {
   const answer = JSON.parse(signal.payload) as RTCSessionDescriptionInit;
   await peer.setRemoteDescription(answer);
+}
+
+async function ingestRemoteIce(
+  signaling: SignalingTransport,
+  ids: SessionIds,
+  peer: PeerConnectionLike
+): Promise<void> {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const signal = await signaling.dequeueSignal(ids.sessionId, ids.studentId, "ice_candidate");
+    if (!signal) {
+      await delay(250);
+      continue;
+    }
+    try {
+      const candidate = JSON.parse(signal.payload) as RTCIceCandidateInit;
+      await peer.addIceCandidate(candidate);
+    } catch {
+      return;
+    }
+  }
 }
 
 function delay(ms: number): Promise<void> {

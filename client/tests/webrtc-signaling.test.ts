@@ -19,6 +19,7 @@ class FakePeer {
   localDescription: RTCSessionDescription | null = null;
   onicecandidate: ((event: RTCPeerConnectionIceEvent) => void) | null = null;
   remoteDescription: RTCSessionDescriptionInit | null = null;
+  candidates: RTCIceCandidateInit[] = [];
   closed = false;
   dataChannel = new FakeDataChannel();
 
@@ -32,6 +33,10 @@ class FakePeer {
 
   async setRemoteDescription(description: RTCSessionDescriptionInit): Promise<void> {
     this.remoteDescription = description;
+  }
+
+  async addIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
+    this.candidates.push(candidate);
   }
 
   createDataChannel(): FakeDataChannel {

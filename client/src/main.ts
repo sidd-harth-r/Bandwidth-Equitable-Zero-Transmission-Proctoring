@@ -2,6 +2,7 @@ import { FusionEngine } from "./coordinator/FusionEngine";
 import { TierClassifier } from "./coordinator/TierClassifier";
 import type { AnomalyScorePayload, WorkerScoreMessage } from "./coordinator/types";
 import { AnomalyScoreClient } from "./network/AnomalyScoreClient";
+import { startLocalProctorLoopback, type LoopbackHandle } from "./network/LocalProctorLoopback";
 import { SignalingClient } from "./network/SignalingClient";
 import {
   sendAnomalyScoreOverDataChannel,
@@ -33,6 +34,7 @@ let framePumpId: ReturnType<typeof setInterval> | undefined;
 let captureCanvas: HTMLCanvasElement | undefined;
 let captureContext: CanvasRenderingContext2D | null = null;
 let captureVideo: HTMLVideoElement | undefined;
+let loopbackHandle: LoopbackHandle | undefined;
 
 app.innerHTML = `
   <section class="shell">
@@ -57,6 +59,11 @@ const latest = document.querySelector<HTMLPreElement>("#latest");
 
 startButton?.addEventListener("click", async () => {
   await startCameraCapture();
+  loopbackHandle = startLocalProctorLoopback(signaling, {
+    sessionId,
+    studentId,
+    proctorId
+  });
   webRtcSession = await startWebRtcSignaling(signaling, {
     sessionId,
     studentId,
@@ -80,10 +87,12 @@ stopButton?.addEventListener("click", () => {
   worker?.postMessage({ type: "stop" });
   worker?.terminate();
   webRtcSession?.peer.close();
+  loopbackHandle?.stop();
   stopFramePump();
   stopCameraCapture();
   worker = undefined;
   webRtcSession = undefined;
+  loopbackHandle = undefined;
   if (startButton) startButton.disabled = false;
   if (stopButton) stopButton.disabled = true;
   if (status) status.textContent = "Stopped";

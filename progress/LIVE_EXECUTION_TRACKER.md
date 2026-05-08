@@ -21,6 +21,8 @@ This file is the single live status board for implementation.
   - `GET /api/v1/signaling/{session_id}/{target_id}/{signal_type}`
 - Client signaling transport + WebRTC offer/ICE wiring.
 - RTCDataChannel score transport with HTTP fallback.
+- Local proctor loopback responder added to establish answer flow in local dev and enable DataChannel-open path validation.
+- Remote ICE candidate ingestion added on the student signaling side.
 - Worker evolved from synthetic placeholder to:
   - frame-driven scoring
   - MediaPipe Pose landmark-based scoring
@@ -30,12 +32,11 @@ This file is the single live status board for implementation.
 
 ## 2) Doing Now
 
-- Finalizing Phase 1 closure docs and status updates.
-- Preparing commit + push for these closure updates.
+- Recording DataChannel-open follow-up implementation and preparing commit + push.
 
 ## 3) Remaining
 
-- Confirm paired-answer signaling path for DataChannel-open status (requires answering peer/proctor path).
+- Re-run manual browser check to confirm `Sent ... (DataChannel)` status appears in UI with loopback responder.
 - Move to post-Phase-1 tasks:
   - Alembic migrations
   - Redis-backed live session state/rate limiting
@@ -43,8 +44,11 @@ This file is the single live status board for implementation.
 ## 4) Exact Command Trace (Recent)
 
 ```powershell
-git status --short
+Get-Content -Path client/src/network/WebRtcSignaling.ts
 Get-Content -Path client/src/main.ts
-Get-Content -Path progress/LIVE_EXECUTION_TRACKER.md
-Get-Content -Path progress/current-status.md
+Get-Content -Path client/tests/webrtc-signaling.test.ts
+Get-Content -Path client/src/network/SignalingClient.ts
+npm.cmd test
+npm.cmd run build
+conda run -n proctor python -m pytest
 ```

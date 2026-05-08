@@ -338,3 +338,10 @@ This document records what changed, why it changed, and how it was performed. Co
 - Why: Phase 1 acceptance requires a real webcam-enabled browser run beyond automated tests.
 - How: launched backend and frontend dev servers, opened `http://127.0.0.1:5173`, started a session with webcam permission, observed live score payload updates, and verified runtime transport status in UI.
 - Result: runtime path verified with live anomaly score output and status text `Sent tier_3 (HTTP fallback)`, confirming worker scoring + local persistence + backend fallback ingestion in a real session.
+
+### Operation 41: Local Proctor Loopback For DataChannel Validation
+
+- What changed: added a local answering peer loopback flow and student-side remote ICE ingestion to support DataChannel-open validation in a single local environment.
+- Why: the prior manual run validated HTTP fallback but did not validate the DataChannel-open path due missing answering peer behavior.
+- How: added `LocalProctorLoopback` responder module, started/stopped it with session lifecycle in `main.ts`, and extended `WebRtcSignaling` to ingest remote ICE candidates after answer application.
+- Result: local environment now has a concrete answering flow needed to validate `Sent ... (DataChannel)` behavior.
