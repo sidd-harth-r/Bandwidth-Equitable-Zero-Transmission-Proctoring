@@ -132,3 +132,16 @@ pre {
   background: #ffffff;
   color: #1d2a32;
 }
+
+#live-datapoints {
+  width: 100%;
+  max-width: 420px;
+  min-height: 120px;
+  margin: 10px 0 0;
+  border: 1px solid #d5dde3;
+  border-radius: 4px;
+  background: #f7fafc;
+  color: #1d2a32;
+  padding: 8px;
+  box-sizing: border-box;
+}

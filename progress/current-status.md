@@ -17,6 +17,9 @@ Phase 1 core vertical slice is operational end-to-end: camera-frame worker scori
 - Client fusion engine, tier classifier, camera-frame + MediaPipe pose worker path with fallback, IndexedDB store, and DataChannel-first score sender with HTTP fallback.
 - Backend and client tests, client build, pip integrity check, and npm audit passing.
 - Manual browser run with webcam permission confirmed live score emission and HTTP fallback status updates.
+- Live datapoint panel now shows frame-derived metrics (`centerX`, `centerY`, `motion`, `brightness`, `brightnessShift`) and landmark coordinates when MediaPipe path is active.
+- Backend CORS now supports dynamic local Vite ports (`localhost`/`127.0.0.1`) to prevent false API-unavailable states in browser sessions.
+- Signaling backend now uses Redis queue semantics to avoid overwriting offer/ICE messages under burst conditions.
 
 ## In Progress
 

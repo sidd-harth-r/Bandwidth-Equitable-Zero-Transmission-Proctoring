@@ -13,6 +13,13 @@ export interface WorkerScoreMessage {
   score: number;
   reason: string;
   sampledAt: string;
+  datapoints?: {
+    centerX: number;
+    centerY: number;
+    motion: number;
+    brightness: number;
+    brightnessShift: number;
+  };
   landmarks?: {
     nose: { x: number; y: number };
     leftShoulder: { x: number; y: number };

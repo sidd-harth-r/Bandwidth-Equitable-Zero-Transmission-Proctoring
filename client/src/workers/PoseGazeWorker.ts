@@ -62,7 +62,8 @@ async function processFrame(frame: {
   height: number;
   pixels: Uint8ClampedArray;
 }): Promise<void> {
-  const proxyScore = scoreFromFrame(frame.width, frame.height, frame.pixels);
+  const frameMetrics = scoreFromFrame(frame.width, frame.height, frame.pixels);
+  const proxyScore = frameMetrics.score;
 
   if (!poseFailed) {
     await ensurePoseDetector();
@@ -80,6 +81,7 @@ async function processFrame(frame: {
           score: poseScore,
           reason: "mediapipe_pose_head_orientation_proxy",
           sampledAt: new Date().toISOString(),
+          datapoints: frameMetrics.datapoints,
           landmarks: landmarks ?? undefined
         });
         return;
@@ -93,7 +95,8 @@ async function processFrame(frame: {
     type: "pose_gaze_score",
     score: proxyScore,
     reason: "camera_frame_motion_orientation_proxy_fallback",
-    sampledAt: new Date().toISOString()
+    sampledAt: new Date().toISOString(),
+    datapoints: frameMetrics.datapoints
   });
 }
 
@@ -173,7 +176,20 @@ function extractOverlayLandmarks(
   };
 }
 
-function scoreFromFrame(width: number, height: number, pixels: Uint8ClampedArray): number {
+function scoreFromFrame(
+  width: number,
+  height: number,
+  pixels: Uint8ClampedArray
+): {
+  score: number;
+  datapoints: {
+    centerX: number;
+    centerY: number;
+    motion: number;
+    brightness: number;
+    brightnessShift: number;
+  };
+} {
   const sampleStep = 8;
   let sum = 0;
   let weightedX = 0;
@@ -192,7 +208,16 @@ function scoreFromFrame(width: number, height: number, pixels: Uint8ClampedArray
   }
 
   if (count === 0 || sum <= 0.0001) {
-    return 0.1;
+    return {
+      score: 0.1,
+      datapoints: {
+        centerX: 0.5,
+        centerY: 0.5,
+        motion: 0,
+        brightness: 0.5,
+        brightnessShift: 0
+      }
+    };
   }
 
   const brightness = sum / count;
@@ -209,7 +234,17 @@ function scoreFromFrame(width: number, height: number, pixels: Uint8ClampedArray
 
   const centerOffset = Math.hypot(centerX - 0.5, centerY - 0.5);
   const rawScore = centerOffset * 1.2 + motion * 3.5 + brightnessShift * 1.8;
-  return Math.max(0, Math.min(1, rawScore));
+  const score = Math.max(0, Math.min(1, rawScore));
+  return {
+    score,
+    datapoints: {
+      centerX,
+      centerY,
+      motion,
+      brightness,
+      brightnessShift
+    }
+  };
 }
 
 export {};

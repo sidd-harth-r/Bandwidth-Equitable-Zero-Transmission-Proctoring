@@ -342,6 +342,29 @@ This document records what changed, why it changed, and how it was performed. Co
 ### Operation 41: Local Proctor Loopback For DataChannel Validation
 
 - What changed: added a local answering peer loopback flow and student-side remote ICE ingestion to support DataChannel-open validation in a single local environment.
+
+## 2026-05-08: Phase 1 Runtime Reliability And Live Datapoints Visibility
+
+### Operation 34: Live Webcam Datapoints Surface
+
+- What changed: extended worker-to-UI message schema and client rendering to display live frame datapoints (`centerX`, `centerY`, `motion`, `brightness`, `brightnessShift`) and landmark coordinates when available.
+- Why: make it verifiable that displayed results are derived from live webcam frames and not synthetic random values.
+- How: updated `client/src/coordinator/types.ts`, `client/src/workers/PoseGazeWorker.ts`, `client/src/main.ts`, and `client/src/styles.css`; then ran `npm.cmd run build` and `npm.cmd test`.
+- Result: camera panel now includes a continuously updating JSON datapoint block tied to live frame processing output.
+
+### Operation 35: Backend CORS Fix For Vite Dynamic Port
+
+- What changed: broadened FastAPI CORS origin matching to allow `localhost` and `127.0.0.1` on dynamic dev ports.
+- Why: browser requests from `http://127.0.0.1:5175` were blocked, causing `Stored locally; API unavailable` despite backend availability.
+- How: added `allow_origin_regex` in `server/src/bezp_server/main.py`, restarted backend, validated preflight headers for origin `http://127.0.0.1:5175`.
+- Result: UI now sends anomaly events to backend successfully; status observed as `Sent tier_3 (HTTP fallback)`.
+
+### Operation 36: Signaling Queue Hardening
+
+- What changed: switched signaling storage from single-key overwrite to Redis list queue semantics.
+- Why: offer/ICE message overwrite risk could drop signaling events and destabilize DataChannel setup.
+- How: changed signaling route enqueue/dequeue to `RPUSH` + `LPOP` with TTL refresh in `server/src/bezp_server/api/routes/signaling.py`; ran `conda run -n proctor pytest -q`.
+- Result: backend signaling path preserves sequential messages reliably; tests pass (`6 passed`).
 - Why: the prior manual run validated HTTP fallback but did not validate the DataChannel-open path due missing answering peer behavior.
 - How: added `LocalProctorLoopback` responder module, started/stopped it with session lifecycle in `main.ts`, and extended `WebRtcSignaling` to ingest remote ICE candidates after answer application.
 - Result: local environment now has a concrete answering flow needed to validate `Sent ... (DataChannel)` behavior.

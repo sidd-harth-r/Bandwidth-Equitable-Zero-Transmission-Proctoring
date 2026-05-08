@@ -1,0 +1,51 @@
+{
+    "generated_at":  "2026-05-08T18:23:33.1759590+05:30",
+    "api_base":  "http://127.0.0.1:8000/api/v1",
+    "session_id":  "session-proof-c2dc714a-1183-44a1-8972-4d72f3666aef",
+    "created":  {
+                    "session_id":  "session-proof-c2dc714a-1183-44a1-8972-4d72f3666aef",
+                    "student_id":  "local-demo-student",
+                    "occurred_at":  "2026-05-08T13:10:00Z",
+                    "channel_scores":  {
+                                           "pose_gaze":  0.22,
+                                           "rppg":  0.0,
+                                           "au":  0.0,
+                                           "keystroke":  0.0
+                                       },
+                    "agreement_index":  0.05,
+                    "weighted_score":  0.22,
+                    "tier":  "tier_3",
+                    "gear":  "gear_1",
+                    "metadata":  {
+                                     "reason":  "phase1_artifact",
+                                     "source":  "integration_proof"
+                                 },
+                    "event_id":  "a86db49e-00f4-4109-a4f1-ae53f3465e1c",
+                    "received_at":  "2026-05-08T12:53:33.108555Z"
+                },
+    "summary":  {
+                    "session_id":  "session-proof-c2dc714a-1183-44a1-8972-4d72f3666aef",
+                    "event_count":  1,
+                    "latest_score":  {
+                                         "session_id":  "session-proof-c2dc714a-1183-44a1-8972-4d72f3666aef",
+                                         "student_id":  "local-demo-student",
+                                         "occurred_at":  "2026-05-08T13:10:00Z",
+                                         "channel_scores":  {
+                                                                "pose_gaze":  0.22,
+                                                                "rppg":  0.0,
+                                                                "au":  0.0,
+                                                                "keystroke":  0.0
+                                                            },
+                                         "agreement_index":  0.05,
+                                         "weighted_score":  0.22,
+                                         "tier":  "tier_3",
+                                         "gear":  "gear_1",
+                                         "metadata":  {
+                                                          "reason":  "phase1_artifact",
+                                                          "source":  "integration_proof"
+                                                      },
+                                         "event_id":  "a86db49e-00f4-4109-a4f1-ae53f3465e1c",
+                                         "received_at":  "2026-05-08T12:53:33.108555Z"
+                                     }
+                }
+}

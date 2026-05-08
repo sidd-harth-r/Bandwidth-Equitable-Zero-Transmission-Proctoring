@@ -18,7 +18,10 @@ def enqueue_signal(
         envelope.target_id,
         envelope.signal_type,
     )
-    redis_client.setex(channel, SIGNAL_TTL_SECONDS, envelope.model_dump_json())
+    pipe = redis_client.pipeline()
+    pipe.rpush(channel, envelope.model_dump_json())
+    pipe.expire(channel, SIGNAL_TTL_SECONDS)
+    pipe.execute()
     return SignalAck(status="queued", channel=channel)
 
 
@@ -35,13 +38,12 @@ def dequeue_signal(
             detail="Unsupported signal type.",
         )
     channel = build_channel(session_id, target_id, signal_type)
-    payload = redis_client.get(channel)
+    payload = redis_client.lpop(channel)
     if payload is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Signal not found.",
         )
-    redis_client.delete(channel)
     return SignalEnvelope.model_validate_json(payload)
 
 

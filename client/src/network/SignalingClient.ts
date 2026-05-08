@@ -36,7 +36,12 @@ export class SignalingClient {
     targetId: string,
     signalType: SignalType
   ): Promise<SignalEnvelope | null> {
-    const response = await fetch(`${this.baseUrl}/signaling/${sessionId}/${targetId}/${signalType}`);
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}/signaling/${sessionId}/${targetId}/${signalType}`);
+    } catch {
+      return null;
+    }
     if (response.status === 404) {
       return null;
     }

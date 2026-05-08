@@ -1,6 +1,6 @@
 # LIVE EXECUTION TRACKER
 
-Last updated: 2026-05-09 (Asia/Calcutta)
+Last updated: 2026-05-08 (Asia/Calcutta)
 
 This file is the single live status board for implementation.
 
@@ -32,7 +32,7 @@ This file is the single live status board for implementation.
 
 ## 2) Doing Now
 
-- Recording DataChannel-open follow-up implementation and preparing commit + push.
+- Preparing commit + push after DataChannel reliability hardening and integration proof artifact generation.
 
 ## 3) Remaining
 
@@ -40,6 +40,12 @@ This file is the single live status board for implementation.
 - Move to post-Phase-1 tasks:
   - Alembic migrations
   - Redis-backed live session state/rate limiting
+
+## 4) New Evidence Artifact
+
+- `progress/phase1-integration-proof.json`
+  - Contains timestamped POST + GET proof for `/api/v1/anomaly-scores` and `/api/v1/anomaly-scores/{session_id}`.
+  - Confirms backend ingestion and summary retrieval path is operational.
 
 ## 4) Exact Command Trace (Recent)
 

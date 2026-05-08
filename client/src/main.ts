@@ -59,6 +59,7 @@ app.innerHTML = `
           <canvas id="camera-overlay" width="320" height="240"></canvas>
         </div>
         <p id="camera-state">Camera: not started</p>
+        <pre id="live-datapoints">Datapoints: waiting</pre>
       </article>
       <article class="detect-panel">
         <h2>Detection Details</h2>
@@ -76,24 +77,32 @@ const stopButton = document.querySelector<HTMLButtonElement>("#stop");
 const status = document.querySelector<HTMLSpanElement>("#status");
 const latest = document.querySelector<HTMLPreElement>("#latest");
 const cameraState = document.querySelector<HTMLParagraphElement>("#camera-state");
+const liveDatapoints = document.querySelector<HTMLPreElement>("#live-datapoints");
 const detectMode = document.querySelector<HTMLParagraphElement>("#detect-mode");
 const detectScore = document.querySelector<HTMLParagraphElement>("#detect-score");
 const cameraFeed = document.querySelector<HTMLVideoElement>("#camera-feed");
 const cameraOverlay = document.querySelector<HTMLCanvasElement>("#camera-overlay");
 
 startButton?.addEventListener("click", async () => {
-  await startCameraCapture();
-  loopbackHandle = startLocalProctorLoopback(signaling, {
-    sessionId,
-    studentId,
-    proctorId
-  });
-  webRtcSession = await startWebRtcSignaling(signaling, {
-    sessionId,
-    studentId,
-    proctorId
-  });
-  void updateSignalingStatus(webRtcSession);
+  try {
+    await startCameraCapture();
+    loopbackHandle = startLocalProctorLoopback(signaling, {
+      sessionId,
+      studentId,
+      proctorId
+    });
+    webRtcSession = await startWebRtcSignaling(signaling, {
+      sessionId,
+      studentId,
+      proctorId
+    });
+    void updateSignalingStatus(webRtcSession);
+  } catch {
+    if (status) {
+      status.textContent = "Running (signaling unavailable)";
+    }
+  }
+
   worker = new Worker(new URL("./workers/PoseGazeWorker.ts", import.meta.url), {
     type: "module"
   });
@@ -104,7 +113,7 @@ startButton?.addEventListener("click", async () => {
   startFramePump();
   startButton.disabled = true;
   if (stopButton) stopButton.disabled = false;
-  if (status) status.textContent = "Running";
+  if (status?.textContent === "Idle") status.textContent = "Running";
 });
 
 stopButton?.addEventListener("click", () => {
@@ -169,6 +178,7 @@ async function handleWorkerScore(message: WorkerScoreMessage): Promise<void> {
 
   updateDetectionDetails(message.reason, message.score);
   drawOverlay(message);
+  updateLiveDatapoints(message);
 }
 
 async function startCameraCapture(): Promise<void> {
@@ -327,6 +337,43 @@ function mapPoint(point: { x: number; y: number }, width: number, height: number
     x: point.x * width,
     y: point.y * height
   };
+}
+
+function updateLiveDatapoints(message: WorkerScoreMessage): void {
+  if (!liveDatapoints) {
+    return;
+  }
+  const payload = {
+    sampledAt: message.sampledAt,
+    mode: message.reason,
+    score: Number(message.score.toFixed(4)),
+    frame: message.datapoints
+      ? {
+          centerX: Number(message.datapoints.centerX.toFixed(4)),
+          centerY: Number(message.datapoints.centerY.toFixed(4)),
+          motion: Number(message.datapoints.motion.toFixed(4)),
+          brightness: Number(message.datapoints.brightness.toFixed(4)),
+          brightnessShift: Number(message.datapoints.brightnessShift.toFixed(4))
+        }
+      : null,
+    landmarks: message.landmarks
+      ? {
+          nose: {
+            x: Number(message.landmarks.nose.x.toFixed(4)),
+            y: Number(message.landmarks.nose.y.toFixed(4))
+          },
+          leftShoulder: {
+            x: Number(message.landmarks.leftShoulder.x.toFixed(4)),
+            y: Number(message.landmarks.leftShoulder.y.toFixed(4))
+          },
+          rightShoulder: {
+            x: Number(message.landmarks.rightShoulder.x.toFixed(4)),
+            y: Number(message.landmarks.rightShoulder.y.toFixed(4))
+          }
+        }
+      : null
+  };
+  liveDatapoints.textContent = JSON.stringify(payload, null, 2);
 }
 
 async function updateSignalingStatus(session: WebRtcSession): Promise<void> {
