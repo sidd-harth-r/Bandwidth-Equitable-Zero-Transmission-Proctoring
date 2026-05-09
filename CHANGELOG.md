@@ -2,7 +2,34 @@
 
 All notable project changes are recorded here. Every future implementation PR should add an entry with date, what changed, why it changed, and any replacement or migration details.
 
-## 2026-05-09 — Phase 4: Human Review Pipeline (partial)
+## 2026-05-09 — Phase 5: Federated Learning Pipeline
+
+### Added
+
+#### Client ML Pipeline
+- `PrivacyEngine.ts` — L2 norm clipping, Gaussian DP noise (Box-Muller), sparsification, 8-bit symmetric quantization, base64 serialization. Full `privatize()` pipeline.
+- `ModelManager.ts` — 2-layer LSTM (64 units) with dynamic TensorFlow.js loading, IndexedDB version cache, frozen inference.
+- `SessionHistory.ts` — Read-only telemetry view with sliding-window training sample extraction (SEQ_LENGTH=150, FEATURE_DIM=20).
+- `FederatedTrainer.ts` — 5-epoch post-exam training with Adam optimizer, weight delta computation, DP privatization, progress callbacks.
+- `GradientTransmitter.ts` — HTTPS gradient upload with 3 retries, exponential backoff, Service Worker fallback.
+
+#### Server ML Pipeline
+- `GradientDeserializer.py` — Base64/JSON to NumPy reconstruction with quantization-aware decoding.
+- `FlowerBrowserClientAdapter.py` — Redis-backed bridge from FastAPI to Flower (base64-encoded pickle queue).
+- `strategy.py` — `FedAvgTieredStrategy` with staleness classification (Tier 0/1/2), weight reduction (0.5× for stale), deferral of 2+ version-behind gradients, minimum client threshold.
+- `validation.py` — Synthetic validation gate with 130 labeled sequences (50 legitimate, 80 anomaly). Rejects on >2% precision OR recall degradation.
+- `federated.py` — `POST /api/v1/federated/gradients` (with GradientPayload schema), `GET /api/v1/federated/model/version`, `GET /api/v1/federated/model/download`.
+
+#### Pretraining
+- `ml/models/lstm_anomaly_detector/pretrain.py` — TensorFlow pretraining script for Lightning AI / Colab with public dataset stubs.
+
+### Verified
+
+- Client: 130 tests pass across 12 test files (13 new privacy engine tests).
+- Client: Build passes (tsc + vite).
+- Backend: 24 tests pass across 3 test files (2 bridge + 7 aggregation/validation).
+
+## 2026-05-09 — Phase 4: Human Review Pipeline (complete)
 
 ### Added
 
