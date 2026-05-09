@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BEZP Proctor Dashboard</title>
+  <meta name="description" content="Proctor review dashboard for BEZP exam proctoring system">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <!-- ── Top Navigation ──────────────────────────────────── -->
+  <header id="header" class="header">
+    <div class="header-left">
+      <h1 class="logo">BEZP <span class="logo-accent">Proctor</span></h1>
+    </div>
+    <nav class="header-nav">
+      <button id="nav-queue" class="nav-btn active" data-view="queue">Review Queue</button>
+      <button id="nav-sessions" class="nav-btn" data-view="sessions">Sessions</button>
+      <button id="nav-labels" class="nav-btn" data-view="labels">Verified Labels</button>
+    </nav>
+    <div class="header-right">
+      <span id="pending-badge" class="badge">0 pending</span>
+      <span class="reviewer-name" id="reviewer-name">Proctor</span>
+    </div>
+  </header>
+
+  <!-- ── Main Content ────────────────────────────────────── -->
+  <main id="main" class="main">
+
+    <!-- Review Queue View -->
+    <section id="view-queue" class="view active-view">
+      <div class="view-header">
+        <h2>Review Queue</h2>
+        <div class="view-controls">
+          <label class="filter-label">
+            <input type="checkbox" id="show-reviewed"> Show Reviewed
+          </label>
+          <button id="refresh-queue" class="btn btn-secondary">↻ Refresh</button>
+        </div>
+      </div>
+      <div id="queue-list" class="queue-list">
+        <div class="empty-state">
+          <div class="empty-icon">📋</div>
+          <p>No clips pending review</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Session List View -->
+    <section id="view-sessions" class="view">
+      <div class="view-header">
+        <h2>Active Sessions</h2>
+        <button id="refresh-sessions" class="btn btn-secondary">↻ Refresh</button>
+      </div>
+      <div id="sessions-list" class="sessions-list">
+        <div class="empty-state">
+          <div class="empty-icon">🖥️</div>
+          <p>No active sessions</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Verified Labels View -->
+    <section id="view-labels" class="view">
+      <div class="view-header">
+        <h2>Verified Labels (FL Training)</h2>
+        <button id="refresh-labels" class="btn btn-secondary">↻ Refresh</button>
+      </div>
+      <div id="labels-stats" class="labels-stats"></div>
+      <div id="labels-list" class="labels-list">
+        <div class="empty-state">
+          <div class="empty-icon">🏷️</div>
+          <p>No verified labels yet</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Review Detail Modal -->
+    <div id="review-modal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modal-title">Review Clip</h3>
+          <button id="modal-close" class="modal-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <!-- Anomaly Timeline -->
+          <div class="timeline-section">
+            <h4>Channel Decomposition</h4>
+            <div id="channel-bars" class="channel-bars"></div>
+          </div>
+
+          <!-- Clip Info -->
+          <div class="clip-info" id="clip-info"></div>
+
+          <!-- Intervention -->
+          <div class="intervention-section">
+            <h4>Send Intervention</h4>
+            <div class="intervention-buttons" id="intervention-buttons">
+              <button class="btn btn-intervention" data-type="look_at_camera">👁️ Look at Camera</button>
+              <button class="btn btn-intervention" data-type="environment_change">🏠 Environment Change</button>
+              <button class="btn btn-intervention" data-type="check_audio">🎤 Check Audio</button>
+              <button class="btn btn-intervention" data-type="identity_check">🪪 Identity Check</button>
+              <button class="btn btn-intervention" data-type="general_warning">⚠️ General Warning</button>
+            </div>
+          </div>
+
+          <!-- Decision -->
+          <div class="decision-section">
+            <h4>Verdict</h4>
+            <textarea id="review-notes" class="review-notes" placeholder="Optional notes..." rows="3"></textarea>
+            <div class="decision-buttons">
+              <button id="btn-not-suspicious" class="btn btn-safe">✓ Not Suspicious</button>
+              <button id="btn-suspicious" class="btn btn-danger">⚠ Suspicious</button>
+              <button id="btn-escalate" class="btn btn-warning">↗ Escalate</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

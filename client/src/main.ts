@@ -1,7 +1,7 @@
-import { FusionEngine } from "./coordinator/FusionEngine";
-import { TierClassifier } from "./coordinator/TierClassifier";
-import type { AnomalyScorePayload, WorkerScoreMessage } from "./coordinator/types";
+import { Coordinator } from "./coordinator/Coordinator";
+import type { AnomalyScorePayload, ChannelScores } from "./coordinator/types";
 import { AnomalyScoreClient } from "./network/AnomalyScoreClient";
+import { SessionHistoryClient } from "./network/SessionHistoryClient";
 import { startLocalProctorLoopback, type LoopbackHandle } from "./network/LocalProctorLoopback";
 import { SignalingClient } from "./network/SignalingClient";
 import {
@@ -19,33 +19,38 @@ if (!app) {
   throw new Error("Missing #app root");
 }
 
+/* ── Configuration ────────────────────────────────────────── */
+
 const studentId = "local-demo-student";
 const proctorId = "local-demo-proctor";
 let activeSessionId = `session-${crypto.randomUUID()}`;
-const fusionEngine = new FusionEngine();
-const tierClassifier = new TierClassifier();
 const store = new SessionStore();
-const client = new AnomalyScoreClient();
+const scoreClient = new AnomalyScoreClient();
+const historyClient = new SessionHistoryClient();
 const signaling = new SignalingClient();
-let worker: Worker | undefined;
+let coordinator: Coordinator | undefined;
 let webRtcSession: WebRtcSession | undefined;
 let mediaStream: MediaStream | undefined;
+let audioContext: AudioContext | undefined;
+let audioAnalyser: AnalyserNode | undefined;
+let audioMagnitudes: Float32Array<ArrayBuffer> | undefined;
 let framePumpId: ReturnType<typeof setInterval> | undefined;
+let audioPumpId: ReturnType<typeof setInterval> | undefined;
 let captureCanvas: HTMLCanvasElement | undefined;
 let captureContext: CanvasRenderingContext2D | null = null;
 let captureVideo: HTMLVideoElement | undefined;
-let overlayCanvas: HTMLCanvasElement | undefined;
-let overlayContext: CanvasRenderingContext2D | null = null;
 let loopbackHandle: LoopbackHandle | undefined;
 let sentEventCount = 0;
 let dataChannelSentCount = 0;
 
+/* ── UI ───────────────────────────────────────────────────── */
+
 app.innerHTML = `
   <section class="shell">
     <header>
-      <p class="eyebrow">BEZP Phase 1</p>
-      <h1>Local Anomaly Score Slice</h1>
-      <p class="summary">Pose/gaze scoring runs from camera frames in a Web Worker, stores locally, and sends derived scores over DataChannel with HTTP fallback.</p>
+      <p class="eyebrow">BEZP Phase 2</p>
+      <h1>Multi-Channel Anomaly Detection</h1>
+      <p class="summary">Four detection channels (Pose/Gaze, rPPG, Action Units, Keystroke) run independently with per-channel baseline calibration. Audio analysis detects voice activity. All channels feed into weighted fusion scoring.</p>
     </header>
     <div class="panel">
       <button id="start" type="button">Start Session</button>
@@ -53,45 +58,170 @@ app.innerHTML = `
       <span id="status">Idle</span>
       <span id="dc-status">DataChannel: not-started</span>
     </div>
-    <pre id="webrtc-debug">WebRTC: waiting</pre>
+
+    <section class="channel-grid" id="channel-grid">
+      <article class="channel-card" id="card-pose-gaze">
+        <div class="channel-header">
+          <span class="channel-dot dot-inactive"></span>
+          <h3>Pose / Gaze</h3>
+        </div>
+        <div class="channel-score" id="score-pose-gaze">0.000</div>
+        <div class="channel-bar"><div class="channel-bar-fill" id="bar-pose-gaze"></div></div>
+        <p class="channel-weight">Weight: 0.35</p>
+      </article>
+      <article class="channel-card" id="card-rppg">
+        <div class="channel-header">
+          <span class="channel-dot dot-inactive"></span>
+          <h3>rPPG</h3>
+        </div>
+        <div class="channel-score" id="score-rppg">0.000</div>
+        <div class="channel-bar"><div class="channel-bar-fill" id="bar-rppg"></div></div>
+        <p class="channel-weight">Weight: 0.20</p>
+      </article>
+      <article class="channel-card" id="card-au">
+        <div class="channel-header">
+          <span class="channel-dot dot-inactive"></span>
+          <h3>Action Units</h3>
+        </div>
+        <div class="channel-score" id="score-au">0.000</div>
+        <div class="channel-bar"><div class="channel-bar-fill" id="bar-au"></div></div>
+        <p class="channel-weight">Weight: 0.25</p>
+      </article>
+      <article class="channel-card" id="card-keystroke">
+        <div class="channel-header">
+          <span class="channel-dot dot-inactive"></span>
+          <h3>Keystroke</h3>
+        </div>
+        <div class="channel-score" id="score-keystroke">0.000</div>
+        <div class="channel-bar"><div class="channel-bar-fill" id="bar-keystroke"></div></div>
+        <p class="channel-weight">Weight: 0.20</p>
+      </article>
+    </section>
+
+    <section class="fusion-panel" id="fusion-panel">
+      <div class="fusion-row">
+        <div class="fusion-stat">
+          <span class="fusion-label">Weighted Score</span>
+          <span class="fusion-value" id="fusion-weighted">0.000</span>
+        </div>
+        <div class="fusion-stat">
+          <span class="fusion-label">Agreement</span>
+          <span class="fusion-value" id="fusion-agreement">0.000</span>
+        </div>
+        <div class="fusion-stat">
+          <span class="fusion-label">Tier</span>
+          <span class="fusion-value fusion-tier" id="fusion-tier">tier_3</span>
+        </div>
+        <div class="fusion-stat">
+          <span class="fusion-label">Gear</span>
+          <span class="fusion-value" id="fusion-gear">gear_1</span>
+        </div>
+        <div class="fusion-stat">
+          <span class="fusion-label">Events Sent</span>
+          <span class="fusion-value" id="fusion-events">0</span>
+        </div>
+      </div>
+    </section>
+
     <section class="telemetry">
       <article class="camera-panel">
         <h2>Camera Feed</h2>
         <div class="camera-stage">
           <video id="camera-feed" autoplay playsinline muted></video>
-          <canvas id="camera-overlay" width="320" height="240"></canvas>
         </div>
         <p id="camera-state">Camera: not started</p>
-        <pre id="live-datapoints">Datapoints: waiting</pre>
       </article>
       <article class="detect-panel">
-        <h2>Detection Details</h2>
-        <p id="detect-mode">Mode: waiting</p>
-        <p id="detect-what">Detects: head orientation proxy (nose vs shoulders), frame motion, and brightness shifts.</p>
-        <p id="detect-score">Score: waiting</p>
+        <h2>Calibration Status</h2>
+        <div id="calibration-status">
+          <p id="cal-pose-gaze">Pose/Gaze: waiting</p>
+          <p id="cal-rppg">rPPG: waiting</p>
+          <p id="cal-au">AU: waiting</p>
+          <p id="cal-keystroke">Keystroke: waiting</p>
+          <p id="cal-audio">Audio: waiting</p>
+        </div>
+        <h2>Keystroke Input</h2>
+        <textarea id="keystroke-area" rows="3" placeholder="Type here for keystroke calibration..."></textarea>
       </article>
     </section>
     <pre id="latest">{}</pre>
   </section>
 `;
 
+/* ── DOM refs ─────────────────────────────────────────────── */
+
 const startButton = document.querySelector<HTMLButtonElement>("#start");
 const stopButton = document.querySelector<HTMLButtonElement>("#stop");
-const status = document.querySelector<HTMLSpanElement>("#status");
+const statusEl = document.querySelector<HTMLSpanElement>("#status");
 const dcStatus = document.querySelector<HTMLSpanElement>("#dc-status");
-const webrtcDebug = document.querySelector<HTMLPreElement>("#webrtc-debug");
 const latest = document.querySelector<HTMLPreElement>("#latest");
 const cameraState = document.querySelector<HTMLParagraphElement>("#camera-state");
-const liveDatapoints = document.querySelector<HTMLPreElement>("#live-datapoints");
-const detectMode = document.querySelector<HTMLParagraphElement>("#detect-mode");
-const detectScore = document.querySelector<HTMLParagraphElement>("#detect-score");
 const cameraFeed = document.querySelector<HTMLVideoElement>("#camera-feed");
-const cameraOverlay = document.querySelector<HTMLCanvasElement>("#camera-overlay");
+const keystrokeArea = document.querySelector<HTMLTextAreaElement>("#keystroke-area");
+
+const channelScoreEls = {
+  pose_gaze: document.getElementById("score-pose-gaze"),
+  rppg: document.getElementById("score-rppg"),
+  au: document.getElementById("score-au"),
+  keystroke: document.getElementById("score-keystroke"),
+};
+
+const channelBarEls = {
+  pose_gaze: document.getElementById("bar-pose-gaze"),
+  rppg: document.getElementById("bar-rppg"),
+  au: document.getElementById("bar-au"),
+  keystroke: document.getElementById("bar-keystroke"),
+};
+
+const channelDots = {
+  pose_gaze: document.querySelector("#card-pose-gaze .channel-dot"),
+  rppg: document.querySelector("#card-rppg .channel-dot"),
+  au: document.querySelector("#card-au .channel-dot"),
+  keystroke: document.querySelector("#card-keystroke .channel-dot"),
+};
+
+const calEls = {
+  pose_gaze: document.getElementById("cal-pose-gaze"),
+  rppg: document.getElementById("cal-rppg"),
+  au: document.getElementById("cal-au"),
+  keystroke: document.getElementById("cal-keystroke"),
+  audio: document.getElementById("cal-audio"),
+};
+
+const fusionWeighted = document.getElementById("fusion-weighted");
+const fusionAgreement = document.getElementById("fusion-agreement");
+const fusionTier = document.getElementById("fusion-tier");
+const fusionGear = document.getElementById("fusion-gear");
+const fusionEvents = document.getElementById("fusion-events");
+
+/* ── Start / Stop ─────────────────────────────────────────── */
 
 startButton?.addEventListener("click", async () => {
   activeSessionId = `session-${crypto.randomUUID()}`;
   sentEventCount = 0;
   dataChannelSentCount = 0;
+
+  // Fetch session history prior and compute adjustments
+  const prior = await historyClient.fetchPrior(studentId);
+  const adjustments = prior
+    ? historyClient.computeAdjustments(prior)
+    : { weights: {}, thresholds: {} };
+
+  // Create Coordinator with adjusted config
+  coordinator = new Coordinator(
+    {
+      sessionId: activeSessionId,
+      studentId,
+      weights: adjustments.weights,
+      thresholds: adjustments.thresholds,
+    },
+    {
+      onAnomalyScore: handleAnomalyScore,
+      onCalibrationProgress: handleCalibrationProgress,
+      onError: handleChannelError,
+    }
+  );
+
   try {
     await startCameraCapture();
     loopbackHandle = startLocalProctorLoopback(signaling, {
@@ -105,63 +235,40 @@ startButton?.addEventListener("click", async () => {
       proctorId
     });
     bindDataChannelStatus(webRtcSession.dataChannel);
-    bindPeerDiagnostics(webRtcSession);
-    void updateSignalingStatus(webRtcSession);
   } catch {
-    if (status) {
-      status.textContent = "Running (signaling unavailable)";
-    }
+    if (statusEl) statusEl.textContent = "Running (signaling unavailable)";
   }
 
-  worker = new Worker(new URL("./workers/PoseGazeWorker.ts", import.meta.url), {
-    type: "module"
-  });
-  worker.onmessage = (event: MessageEvent<WorkerScoreMessage>) => {
-    void handleWorkerScore(event.data);
-  };
-  worker.postMessage({ type: "start" });
+  coordinator.start();
   startFramePump();
+  startAudioCapture();
+  bindKeystrokeEvents();
+
   startButton.disabled = true;
   if (stopButton) stopButton.disabled = false;
-  if (status?.textContent === "Idle") status.textContent = "Running";
+  if (statusEl?.textContent === "Idle") statusEl.textContent = "Running — calibrating…";
 });
 
 stopButton?.addEventListener("click", () => {
-  worker?.postMessage({ type: "stop" });
-  worker?.terminate();
+  coordinator?.stop();
+  coordinator = undefined;
   webRtcSession?.peer.close();
   loopbackHandle?.stop();
   stopFramePump();
+  stopAudioCapture();
   stopCameraCapture();
-  worker = undefined;
   webRtcSession = undefined;
   loopbackHandle = undefined;
   if (startButton) startButton.disabled = false;
   if (stopButton) stopButton.disabled = true;
-  if (status) status.textContent = "Stopped";
+  if (statusEl) statusEl.textContent = "Stopped";
 });
 
-async function handleWorkerScore(message: WorkerScoreMessage): Promise<void> {
-  const fusion = fusionEngine.fuse({
-    pose_gaze: message.score,
-    rppg: 0,
-    au: 0,
-    keystroke: 0
-  });
-  const payload: AnomalyScorePayload = {
-    ...fusion,
-    session_id: activeSessionId,
-    student_id: studentId,
-    occurred_at: message.sampledAt,
-    tier: tierClassifier.classify(fusion),
-    gear: "gear_1",
-    metadata: {
-      source: "pose_gaze_worker",
-      reason: message.reason
-    }
-  };
+/* ── Anomaly score handler ────────────────────────────────── */
 
+async function handleAnomalyScore(payload: AnomalyScorePayload): Promise<void> {
   await store.addAnomalyEvent(payload);
+
   const sentViaDataChannel =
     webRtcSession !== undefined
       ? sendAnomalyScoreOverDataChannel(webRtcSession.dataChannel, payload)
@@ -170,57 +277,106 @@ async function handleWorkerScore(message: WorkerScoreMessage): Promise<void> {
   if (sentViaDataChannel) {
     sentEventCount += 1;
     dataChannelSentCount += 1;
-    if (status) status.textContent = `Sent ${payload.tier} (DataChannel) #${sentEventCount} ${formatNow()}`;
-    if (dcStatus) {
-      dcStatus.textContent = `DataChannel: open, sent=${dataChannelSentCount}`;
-    }
+    if (statusEl) statusEl.textContent = `Sent ${payload.tier} (DC) #${sentEventCount} ${formatNow()}`;
+    if (dcStatus) dcStatus.textContent = `DataChannel: open, sent=${dataChannelSentCount}`;
   } else {
     try {
-      await client.send(payload);
+      await scoreClient.send(payload);
       sentEventCount += 1;
-      if (status) {
-        status.textContent = `Sent ${payload.tier} (HTTP fallback) #${sentEventCount} ${formatNow()}`;
-      }
-    } catch (error) {
-      if (status) status.textContent = "Stored locally; API unavailable";
+      if (statusEl) statusEl.textContent = `Sent ${payload.tier} (HTTP) #${sentEventCount} ${formatNow()}`;
+    } catch {
+      if (statusEl) statusEl.textContent = "Stored locally; API unavailable";
     }
   }
+
+  updateChannelUI(payload.channel_scores);
+  updateFusionUI(payload);
 
   if (latest) {
     latest.textContent = JSON.stringify(payload, null, 2);
   }
-
-  updateDetectionDetails(message.reason, message.score);
-  drawOverlay(message);
-  updateLiveDatapoints(message);
 }
 
-async function startCameraCapture(): Promise<void> {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    return;
+/* ── Calibration progress handler ─────────────────────────── */
+
+function handleCalibrationProgress(channel: string, progress: string): void {
+  const el = calEls[channel as keyof typeof calEls];
+  if (el) {
+    const label = channel.replace("_", "/").toUpperCase();
+    if (progress.includes("complete")) {
+      el.textContent = `${label}: ✅ calibrated`;
+      el.classList.add("cal-done");
+    } else {
+      el.textContent = `${label}: ${progress}`;
+    }
   }
+}
+
+function handleChannelError(channel: string, error: unknown): void {
+  const el = calEls[channel as keyof typeof calEls];
+  if (el) {
+    el.textContent = `${channel}: ⚠ error`;
+  }
+  console.warn(`[${channel}] worker error:`, error);
+}
+
+/* ── UI updates ───────────────────────────────────────────── */
+
+function updateChannelUI(scores: ChannelScores): void {
+  const channels = ["pose_gaze", "rppg", "au", "keystroke"] as const;
+  for (const ch of channels) {
+    const scoreVal = scores[ch];
+    const scoreEl = channelScoreEls[ch];
+    const barEl = channelBarEls[ch] as HTMLDivElement | null;
+    const dotEl = channelDots[ch];
+
+    if (scoreEl) scoreEl.textContent = scoreVal.toFixed(3);
+    if (barEl) {
+      barEl.style.width = `${Math.round(scoreVal * 100)}%`;
+      barEl.className = "channel-bar-fill";
+      if (scoreVal >= 0.6) barEl.classList.add("bar-high");
+      else if (scoreVal >= 0.3) barEl.classList.add("bar-mid");
+      else barEl.classList.add("bar-low");
+    }
+    if (dotEl) {
+      dotEl.className = "channel-dot";
+      if (scoreVal > 0 || coordinator?.getChannelReadiness()[ch]) {
+        dotEl.classList.add("dot-active");
+      } else {
+        dotEl.classList.add("dot-inactive");
+      }
+    }
+  }
+}
+
+function updateFusionUI(payload: AnomalyScorePayload): void {
+  if (fusionWeighted) fusionWeighted.textContent = payload.weighted_score.toFixed(3);
+  if (fusionAgreement) fusionAgreement.textContent = payload.agreement_index.toFixed(3);
+  if (fusionTier) {
+    fusionTier.textContent = payload.tier;
+    fusionTier.className = "fusion-value fusion-tier";
+    fusionTier.classList.add(`tier-${payload.tier.replace("tier_", "")}`);
+  }
+  if (fusionGear) fusionGear.textContent = payload.gear;
+  if (fusionEvents) fusionEvents.textContent = String(sentEventCount);
+}
+
+/* ── Camera capture ───────────────────────────────────────── */
+
+async function startCameraCapture(): Promise<void> {
+  if (!navigator.mediaDevices?.getUserMedia) return;
 
   mediaStream = await navigator.mediaDevices.getUserMedia({
     video: { width: 320, height: 240, frameRate: { ideal: 10, max: 15 } },
-    audio: false
+    audio: true // Enable audio for AudioAnalyser
   });
-  if (!cameraFeed) {
-    throw new Error("Missing camera feed element");
-  }
+
+  if (!cameraFeed) throw new Error("Missing camera feed element");
   captureVideo = cameraFeed;
   captureVideo.srcObject = mediaStream;
   await captureVideo.play();
 
-  overlayCanvas = cameraOverlay ?? undefined;
-  overlayContext = overlayCanvas?.getContext("2d") ?? null;
-  if (overlayCanvas) {
-    overlayCanvas.width = 320;
-    overlayCanvas.height = 240;
-  }
-
-  if (cameraState) {
-    cameraState.textContent = "Camera: active";
-  }
+  if (cameraState) cameraState.textContent = "Camera: active";
 
   captureCanvas = document.createElement("canvas");
   captureCanvas.width = 160;
@@ -240,36 +396,24 @@ function stopCameraCapture(): void {
   }
   mediaStream = undefined;
   captureVideo = undefined;
-  if (overlayContext && overlayCanvas) {
-    overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-  }
-  overlayCanvas = undefined;
-  overlayContext = null;
   captureCanvas = undefined;
   captureContext = null;
-  if (cameraState) {
-    cameraState.textContent = "Camera: stopped";
-  }
+  if (cameraState) cameraState.textContent = "Camera: stopped";
 }
 
+/* ── Frame pump (sends frames to Coordinator) ─────────────── */
+
 function startFramePump(): void {
-  if (!captureVideo || !captureCanvas || !captureContext || !worker) {
-    return;
-  }
+  if (!captureVideo || !captureCanvas || !captureContext || !coordinator) return;
 
   framePumpId = setInterval(() => {
-    if (!captureVideo || !captureCanvas || !captureContext || !worker) {
-      return;
-    }
+    if (!captureVideo || !captureCanvas || !captureContext || !coordinator) return;
 
     captureContext.drawImage(captureVideo, 0, 0, captureCanvas.width, captureCanvas.height);
     const image = captureContext.getImageData(0, 0, captureCanvas.width, captureCanvas.height);
-    worker.postMessage({
-      type: "frame",
-      width: captureCanvas.width,
-      height: captureCanvas.height,
-      pixels: image.data
-    });
+
+    // Send to Coordinator which distributes to PoseGaze, rPPG, and AU workers
+    coordinator.sendFrame(captureCanvas.width, captureCanvas.height, image.data);
   }, 700);
 }
 
@@ -280,203 +424,84 @@ function stopFramePump(): void {
   }
 }
 
-function formatNow(): string {
-  const now = new Date();
-  return now.toLocaleTimeString();
+/* ── Audio capture ────────────────────────────────────────── */
+
+function startAudioCapture(): void {
+  if (!mediaStream || !coordinator) return;
+
+  const audioTracks = mediaStream.getAudioTracks();
+  if (audioTracks.length === 0) return;
+
+  try {
+    audioContext = new AudioContext();
+    const source = audioContext.createMediaStreamSource(mediaStream);
+    audioAnalyser = audioContext.createAnalyser();
+    audioAnalyser.fftSize = 512;
+    source.connect(audioAnalyser);
+    audioMagnitudes = new Float32Array(audioAnalyser.frequencyBinCount);
+
+    audioPumpId = setInterval(() => {
+      if (!audioAnalyser || !audioMagnitudes || !coordinator) return;
+      audioAnalyser.getFloatFrequencyData(audioMagnitudes);
+      coordinator.sendAudioMagnitudes(audioMagnitudes);
+    }, 200);
+  } catch {
+    // Audio analysis not available — graceful degradation
+  }
 }
 
-function updateDetectionDetails(reason: string, score: number): void {
-  if (detectMode) {
-    if (reason.includes("mediapipe_pose")) {
-      detectMode.textContent = "Mode: MediaPipe Pose landmarks (nose/shoulder orientation proxy)";
-    } else if (reason.includes("fallback")) {
-      detectMode.textContent = "Mode: fallback frame proxy (motion + brightness + center drift)";
-    } else {
-      detectMode.textContent = `Mode: ${reason}`;
-    }
+function stopAudioCapture(): void {
+  if (audioPumpId !== undefined) {
+    clearInterval(audioPumpId);
+    audioPumpId = undefined;
   }
-
-  if (detectScore) {
-    const band = score >= 0.6 ? "elevated" : score >= 0.3 ? "moderate" : "low";
-    detectScore.textContent = `Score: ${score.toFixed(3)} (${band})`;
+  if (audioContext) {
+    void audioContext.close();
+    audioContext = undefined;
   }
+  audioAnalyser = undefined;
+  audioMagnitudes = undefined;
 }
 
-function drawOverlay(message: WorkerScoreMessage): void {
-  if (!overlayContext || !overlayCanvas) {
-    return;
-  }
+/* ── Keystroke event binding ──────────────────────────────── */
 
-  overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-  if (!message.landmarks) {
-    return;
-  }
+function bindKeystrokeEvents(): void {
+  if (!keystrokeArea || !coordinator) return;
 
-  const nose = mapPoint(message.landmarks.nose, overlayCanvas.width, overlayCanvas.height);
-  const leftShoulder = mapPoint(
-    message.landmarks.leftShoulder,
-    overlayCanvas.width,
-    overlayCanvas.height
-  );
-  const rightShoulder = mapPoint(
-    message.landmarks.rightShoulder,
-    overlayCanvas.width,
-    overlayCanvas.height
-  );
+  keystrokeArea.addEventListener("keydown", (e: KeyboardEvent) => {
+    coordinator?.sendKeydown(e.key, Date.now());
+  });
 
-  overlayContext.strokeStyle = "#15aabf";
-  overlayContext.lineWidth = 2;
-  overlayContext.beginPath();
-  overlayContext.moveTo(leftShoulder.x, leftShoulder.y);
-  overlayContext.lineTo(rightShoulder.x, rightShoulder.y);
-  overlayContext.stroke();
+  keystrokeArea.addEventListener("keyup", (e: KeyboardEvent) => {
+    coordinator?.sendKeyup(e.key, Date.now());
+  });
 
-  drawPoint(nose.x, nose.y, "#ff6b6b");
-  drawPoint(leftShoulder.x, leftShoulder.y, "#4dabf7");
-  drawPoint(rightShoulder.x, rightShoulder.y, "#4dabf7");
+  keystrokeArea.addEventListener("paste", (e: ClipboardEvent) => {
+    const text = e.clipboardData?.getData("text") ?? "";
+    coordinator?.sendPaste(Date.now(), text.length);
+  });
 }
 
-function drawPoint(x: number, y: number, color: string): void {
-  if (!overlayContext) {
-    return;
-  }
-  overlayContext.fillStyle = color;
-  overlayContext.beginPath();
-  overlayContext.arc(x, y, 4, 0, Math.PI * 2);
-  overlayContext.fill();
-}
-
-function mapPoint(point: { x: number; y: number }, width: number, height: number): { x: number; y: number } {
-  return {
-    x: point.x * width,
-    y: point.y * height
-  };
-}
-
-function updateLiveDatapoints(message: WorkerScoreMessage): void {
-  if (!liveDatapoints) {
-    return;
-  }
-  const payload = {
-    sampledAt: message.sampledAt,
-    mode: message.reason,
-    score: Number(message.score.toFixed(4)),
-    frame: message.datapoints
-      ? {
-          centerX: Number(message.datapoints.centerX.toFixed(4)),
-          centerY: Number(message.datapoints.centerY.toFixed(4)),
-          motion: Number(message.datapoints.motion.toFixed(4)),
-          brightness: Number(message.datapoints.brightness.toFixed(4)),
-          brightnessShift: Number(message.datapoints.brightnessShift.toFixed(4))
-        }
-      : null,
-    landmarks: message.landmarks
-      ? {
-          nose: {
-            x: Number(message.landmarks.nose.x.toFixed(4)),
-            y: Number(message.landmarks.nose.y.toFixed(4))
-          },
-          leftShoulder: {
-            x: Number(message.landmarks.leftShoulder.x.toFixed(4)),
-            y: Number(message.landmarks.leftShoulder.y.toFixed(4))
-          },
-          rightShoulder: {
-            x: Number(message.landmarks.rightShoulder.x.toFixed(4)),
-            y: Number(message.landmarks.rightShoulder.y.toFixed(4))
-          }
-        }
-      : null
-  };
-  liveDatapoints.textContent = JSON.stringify(payload, null, 2);
-}
+/* ── DataChannel status ───────────────────────────────────── */
 
 function bindDataChannelStatus(channel: {
   readyState: string;
   addEventListener?: (type: string, listener: () => void) => void;
 }): void {
-  if (!dcStatus) {
-    return;
-  }
+  if (!dcStatus) return;
   dcStatus.textContent = `DataChannel: ${channel.readyState}`;
   if (typeof channel.addEventListener === "function") {
     channel.addEventListener("open", () => {
-      if (dcStatus) {
-        dcStatus.textContent = `DataChannel: open, sent=${dataChannelSentCount}`;
-      }
-      writeWebRtcDebug("datachannel_open");
+      if (dcStatus) dcStatus.textContent = `DataChannel: open, sent=${dataChannelSentCount}`;
     });
     channel.addEventListener("close", () => {
-      if (dcStatus) {
-        dcStatus.textContent = "DataChannel: closed";
-      }
-      writeWebRtcDebug("datachannel_closed");
+      if (dcStatus) dcStatus.textContent = "DataChannel: closed";
     });
   }
 }
 
-function bindPeerDiagnostics(session: WebRtcSession): void {
-  const rtcPeer = session.peer as RTCPeerConnection;
-  writeWebRtcDebug("signaling_started");
-  if (typeof rtcPeer.addEventListener !== "function") {
-    return;
-  }
-  rtcPeer.addEventListener("iceconnectionstatechange", () => {
-    writeWebRtcDebug("iceconnectionstatechange", session);
-  });
-  rtcPeer.addEventListener("connectionstatechange", () => {
-    writeWebRtcDebug("connectionstatechange", session);
-  });
-  rtcPeer.addEventListener("signalingstatechange", () => {
-    writeWebRtcDebug("signalingstatechange", session);
-  });
-  rtcPeer.addEventListener("icegatheringstatechange", () => {
-    writeWebRtcDebug("icegatheringstatechange", session);
-  });
-}
+/* ── Helpers ──────────────────────────────────────────────── */
 
-function writeWebRtcDebug(eventName: string, session?: WebRtcSession): void {
-  if (!webrtcDebug) {
-    return;
-  }
-  const rtcPeer = (session?.peer ?? webRtcSession?.peer) as RTCPeerConnection | undefined;
-  const payload = {
-    event: eventName,
-    at: new Date().toISOString(),
-    dc_state: webRtcSession?.dataChannel.readyState ?? "none",
-    sent_via_dc: dataChannelSentCount,
-    answer_received: session?.diagnostics.answerReceived ?? webRtcSession?.diagnostics.answerReceived ?? false,
-    answer_payload_size:
-      session?.diagnostics.answerPayloadSize ?? webRtcSession?.diagnostics.answerPayloadSize ?? 0,
-    answer_parse_ok: session?.diagnostics.answerParseOk ?? webRtcSession?.diagnostics.answerParseOk ?? false,
-    set_remote_description_error:
-      session?.diagnostics.setRemoteDescriptionError ??
-      webRtcSession?.diagnostics.setRemoteDescriptionError ??
-      null,
-    local_ice_candidates:
-      session?.diagnostics.localIceCandidates ?? webRtcSession?.diagnostics.localIceCandidates ?? 0,
-    remote_ice_candidates:
-      session?.diagnostics.remoteIceCandidates ?? webRtcSession?.diagnostics.remoteIceCandidates ?? 0,
-    peer_connection_state: rtcPeer?.connectionState ?? "n/a",
-    peer_ice_connection_state: rtcPeer?.iceConnectionState ?? "n/a",
-    peer_ice_gathering_state: rtcPeer?.iceGatheringState ?? "n/a",
-    peer_signaling_state: rtcPeer?.signalingState ?? "n/a",
-    loopback: loopbackHandle?.getDiagnostics ? loopbackHandle.getDiagnostics() : null
-    ,
-    signaling_last_dequeue: signaling.getLastDequeueTrace()
-  };
-  webrtcDebug.textContent = JSON.stringify(payload, null, 2);
-}
-
-async function updateSignalingStatus(session: WebRtcSession): Promise<void> {
-  try {
-    const answered = await session.waitForAnswer;
-    if (answered && status) {
-      status.textContent = "Signaling answer received";
-      writeWebRtcDebug("answer_applied", session);
-    }
-  } catch {
-    if (status) {
-      status.textContent = "Running";
-    }
-  }
+function formatNow(): string {
+  return new Date().toLocaleTimeString();
 }

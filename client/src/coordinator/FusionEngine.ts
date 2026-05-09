@@ -1,4 +1,9 @@
-import type { ChannelScores, FusionResult } from "./types";
+import type {
+  ChannelScores,
+  ChannelWeightConfig,
+  FusionResult,
+} from "./types";
+import { DEFAULT_CHANNEL_WEIGHTS } from "./types";
 
 const CHANNEL_KEYS: Array<keyof ChannelScores> = [
   "pose_gaze",
@@ -8,10 +13,25 @@ const CHANNEL_KEYS: Array<keyof ChannelScores> = [
 ];
 
 export class FusionEngine {
-  private readonly weights: ChannelScores;
+  private readonly weights: ChannelWeightConfig;
 
-  constructor(weights: ChannelScores = { pose_gaze: 1, rppg: 0, au: 0, keystroke: 0 }) {
-    this.weights = weights;
+  constructor(weights?: Partial<ChannelWeightConfig>) {
+    this.weights = {
+      ...DEFAULT_CHANNEL_WEIGHTS,
+      ...weights,
+    };
+  }
+
+  /**
+   * Update channel weights at runtime (e.g. from config push or
+   * when a channel reports degraded quality).
+   */
+  updateWeights(patch: Partial<ChannelWeightConfig>): void {
+    Object.assign(this.weights, patch);
+  }
+
+  getWeights(): Readonly<ChannelWeightConfig> {
+    return { ...this.weights };
   }
 
   fuse(channelScores: ChannelScores): FusionResult {
@@ -19,7 +39,11 @@ export class FusionEngine {
     const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
     const variance =
       scores.reduce((sum, score) => sum + Math.pow(score - mean, 2), 0) / scores.length;
+
+    // Channel Agreement Index — lower variance = higher agreement
     const agreementIndex = Math.min(0.5, Math.sqrt(variance));
+
+    // Weighted score using configured weights
     const totalWeight = CHANNEL_KEYS.reduce((sum, key) => sum + this.weights[key], 0) || 1;
     const weightedScore =
       CHANNEL_KEYS.reduce(
