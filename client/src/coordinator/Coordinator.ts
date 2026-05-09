@@ -449,11 +449,18 @@ export class Coordinator {
 
   /* ── Fusion & emission ─────────────────────────────────── */
 
+  private prevHash: string = "";
+
   private emitFusion(sampledAt: string, reason: string): void {
     const fusion: FusionResult = this.fusionEngine.fuse(this.channelScores);
     const tier = this.tierClassifier.classify(fusion);
 
-    const payload: AnomalyScorePayload = {
+    // Initial hash is the session ID
+    if (!this.prevHash) {
+      this.prevHash = this.config.sessionId;
+    }
+
+    const payloadBase = {
       ...fusion,
       session_id: this.config.sessionId,
       student_id: this.config.studentId,
@@ -466,6 +473,32 @@ export class Coordinator {
       },
     };
 
-    void this.callbacks.onAnomalyScore(payload);
+    // Compute hash including previous hash
+    const hashInput = JSON.stringify({
+      ...payloadBase,
+      prev_hash: this.prevHash
+    });
+
+    // We'll use a placeholder and then fill it if we were async, 
+    // but we need to update this.prevHash.
+    // For simplicity in this demo environment, we'll use a mock hash or a simple string-based hash 
+    // if SubtleCrypto is too complex to wait for here, but the requirement is SHA-256.
+    // Let's implement a real one.
+    
+    void this.computeHash(hashInput).then(hash => {
+      this.prevHash = hash;
+      const payload: AnomalyScorePayload = {
+        ...payloadBase,
+        chain_hash: hash
+      };
+      void this.callbacks.onAnomalyScore(payload);
+    });
+  }
+
+  private async computeHash(message: string): Promise<string> {
+    const msgUint8 = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
   }
 }

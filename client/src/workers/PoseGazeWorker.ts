@@ -78,12 +78,26 @@ async function processFrame(frame: {
   height: number;
   pixels: Uint8ClampedArray;
 }): Promise<void> {
+  const startTime = performance.now();
   const frameMetrics = scoreFromFrame(frame.width, frame.height, frame.pixels);
   const proxyScore = frameMetrics.score;
 
   if (!poseFailed) {
     await ensurePoseDetector();
   }
+
+  const done = (score: number, reason: string, landmarks?: any) => {
+    const processingTimeMs = performance.now() - startTime;
+    workerScope.postMessage({
+      type: "pose_gaze_score",
+      score,
+      reason,
+      sampledAt: new Date().toISOString(),
+      processingTimeMs,
+      datapoints: frameMetrics.datapoints,
+      landmarks
+    } as any);
+  };
 
   if (poseDetector && poseReady) {
     try {
@@ -92,28 +106,15 @@ async function processFrame(frame: {
       const poseScore = latestPoseScore;
       if (poseScore !== null) {
         const landmarks = extractOverlayLandmarks(lastPoseLandmarks);
-        workerScope.postMessage({
-          type: "pose_gaze_score",
-          score: poseScore,
-          reason: "mediapipe_pose_head_orientation_proxy",
-          sampledAt: new Date().toISOString(),
-          datapoints: frameMetrics.datapoints,
-          landmarks: landmarks ?? undefined
-        });
+        done(poseScore, "mediapipe_pose_head_orientation_proxy", landmarks);
         return;
       }
-    } catch {
+    } catch (err) {
       poseFailed = true;
     }
   }
 
-  workerScope.postMessage({
-    type: "pose_gaze_score",
-    score: proxyScore,
-    reason: "camera_frame_motion_orientation_proxy_fallback",
-    sampledAt: new Date().toISOString(),
-    datapoints: frameMetrics.datapoints
-  });
+  done(proxyScore, "fallback_frame_proxy_low_res", undefined);
 }
 
 async function ensurePoseDetector(): Promise<void> {

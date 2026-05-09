@@ -23,6 +23,7 @@ export interface WorkerScoreMessage {
   score: number;
   reason: string;
   sampledAt: string;
+  processingTimeMs: number;
   datapoints?: {
     centerX: number;
     centerY: number;
@@ -44,6 +45,7 @@ export interface RppgScoreMessage {
   score: number;
   reason: string;
   sampledAt: string;
+  processingTimeMs: number;
   heartRateEstimate: number | null;
   signalQuality: number;
   isCalibrating: boolean;
@@ -73,6 +75,7 @@ export interface AuScoreMessage {
   score: number;
   reason: string;
   sampledAt: string;
+  processingTimeMs: number;
   activations: AuActivation;
   isCalibrating: boolean;
 }
@@ -100,6 +103,7 @@ export interface KeystrokeScoreMessage {
   score: number;
   reason: string;
   sampledAt: string;
+  processingTimeMs: number;
   features: KeystrokeFeatures;
   isCalibrating: boolean;
 }
@@ -121,6 +125,7 @@ export interface AudioScoreMessage {
   score: number;
   reason: string;
   sampledAt: string;
+  processingTimeMs: number;
   spectralEnergy: number;
   voicePresent: boolean;
   isCalibrating: boolean;
@@ -149,6 +154,7 @@ export interface AnomalyScorePayload extends FusionResult {
   occurred_at: string;
   tier: Tier;
   gear: Gear;
+  chain_hash: string;
   metadata: Record<string, string>;
 }
 

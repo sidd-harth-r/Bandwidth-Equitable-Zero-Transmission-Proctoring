@@ -35,7 +35,81 @@ class GradientPayload(BaseModel):
     timestamp: int  # Unix milliseconds
 
 
+class RollbackRequest(BaseModel):
+    target_version: int
+
+# ── Dependencies ──────────────────────────────────────────
+
+from fastapi import Header
+from bezp_server.config import get_settings
+from bezp_server.api.dependencies import get_db, get_redis
+from bezp_server.services.ModelRollbackService import ModelRollbackService
+from sqlalchemy.orm import Session
+
+async def verify_admin_key(x_admin_key: str = Header(...)):
+    settings = get_settings()
+    if x_admin_key != settings.admin_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid admin API key"
+        )
+
 # ── Routes ──────────────────────────────────────────────────
+
+@router.post("/rollback", status_code=status.HTTP_200_OK, dependencies=[Depends(verify_admin_key)])
+async def rollback_model(
+    req: RollbackRequest,
+    db: Session = Depends(get_db),
+    redis_client: Redis = Depends(get_redis),
+    rate_limiter: RateLimiter = Depends(get_rate_limiter)
+):
+    """
+    Rollback the global model to a specific version.
+    Protected by X-Admin-Key and rate limited to 5 per hour.
+    """
+    # Rate limit check (5 per hour)
+    allowed, retry_after = rate_limiter.allow(
+        namespace="admin",
+        subject="rollback",
+        limit=5,
+        window_seconds=3600
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rollback rate limit exceeded. Retry after {retry_after}s."
+        )
+
+    service = ModelRollbackService(db, redis_client)
+    try:
+        version = service.rollback_to_version(req.target_version)
+        return {
+            "status": "success",
+            "message": f"Rolled back to version {version.version}",
+            "version": version.version,
+            "precision": version.precision,
+            "recall": version.recall
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.get("/model/history", dependencies=[Depends(verify_admin_key)])
+async def get_model_history(db: Session = Depends(get_db), redis_client: Redis = Depends(get_redis)):
+    service = ModelRollbackService(db, redis_client)
+    history = service.get_version_history()
+    return [
+        {
+            "version": v.version,
+            "created_at": v.created_at,
+            "precision": v.precision,
+            "recall": v.recall,
+            "num_gradients": v.num_gradients,
+            "status": v.status
+        }
+        for v in history
+    ]
 
 @router.post("/gradients", status_code=status.HTTP_202_ACCEPTED)
 async def upload_gradients(
@@ -43,6 +117,7 @@ async def upload_gradients(
     rate_limiter: RateLimiter = Depends(get_rate_limiter),
     redis_client: Redis = Depends(get_redis)
 ):
+
     """
     Receive privatized local gradients from a client after exam completion.
     The payload is deserialized and handed off to the Flower server via Redis.

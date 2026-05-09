@@ -22,7 +22,8 @@ dependencies = [
 dev = [
   "pytest",
   "pytest-asyncio",
-  "httpx"
+  "httpx",
+  "locust"
 ]
 
 [tool.pytest.ini_options]

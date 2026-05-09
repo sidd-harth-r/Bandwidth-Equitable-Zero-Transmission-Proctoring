@@ -39,7 +39,21 @@ function processFrame(
   height: number,
   pixels: Uint8ClampedArray
 ): void {
+  const startTime = performance.now();
   const activations = computeAuFromFrame(width, height, pixels);
+
+  const done = (score: number, reason: string, isCalibrating: boolean) => {
+    const processingTimeMs = performance.now() - startTime;
+    workerScope.postMessage({
+      type: "au_score",
+      score,
+      reason,
+      sampledAt: new Date().toISOString(),
+      processingTimeMs,
+      activations,
+      isCalibrating,
+    });
+  };
 
   if (calibrating) {
     calibrationFrames.push(activations);
@@ -49,53 +63,24 @@ function processFrame(
       calibrating = false;
       calibrationFrames = [];
 
-      workerScope.postMessage({
-        type: "au_score",
-        score: 0,
-        reason: "calibration_complete",
-        sampledAt: new Date().toISOString(),
-        activations,
-        isCalibrating: false,
-      });
+      done(0, "calibration_complete", false);
       return;
     }
 
     const progress = Math.round(
       (calibrationFrames.length / CALIBRATION_FRAME_TARGET) * 100
     );
-    workerScope.postMessage({
-      type: "au_score",
-      score: 0,
-      reason: `calibrating_${progress}pct`,
-      sampledAt: new Date().toISOString(),
-      activations,
-      isCalibrating: true,
-    });
+    done(0, `calibrating_${progress}pct`, true);
     return;
   }
 
   if (!baseline) {
-    workerScope.postMessage({
-      type: "au_score",
-      score: 0,
-      reason: "no_baseline",
-      sampledAt: new Date().toISOString(),
-      activations,
-      isCalibrating: false,
-    });
+    done(0, "no_baseline", false);
     return;
   }
 
   const score = computeAuAnomalyScore(activations, baseline);
-
-  workerScope.postMessage({
-    type: "au_score",
-    score,
-    reason: "au_active",
-    sampledAt: new Date().toISOString(),
-    activations,
-    isCalibrating: false,
-  });
+  done(score, "au_active", false);
 }
 
 /* ── Worker message handler ───────────────────────────────── */

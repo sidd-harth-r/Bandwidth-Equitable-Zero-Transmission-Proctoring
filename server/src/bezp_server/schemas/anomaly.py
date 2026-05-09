@@ -35,6 +35,7 @@ class AnomalyScoreIn(BaseModel):
     weighted_score: float = Field(..., ge=0.0, le=1.0)
     tier: Tier
     gear: Gear
+    chain_hash: str = Field(..., min_length=64, max_length=64)
     metadata: Dict[str, str] = Field(default_factory=dict)
 
     @field_validator("occurred_at")

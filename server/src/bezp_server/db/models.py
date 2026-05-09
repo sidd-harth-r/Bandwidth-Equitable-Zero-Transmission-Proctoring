@@ -25,6 +25,7 @@ class AnomalyEvent(Base):
     weighted_score: Mapped[float] = mapped_column(Float, nullable=False)
     tier: Mapped[str] = mapped_column(String(32), nullable=False)
     gear: Mapped[str] = mapped_column(String(32), nullable=False)
+    chain_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     event_metadata: Mapped[dict[str, str]] = mapped_column(JSONB, nullable=False, default=dict)
 
 
@@ -70,4 +71,22 @@ class ReviewDecision(Base):
     decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     fl_weight: Mapped[float] = mapped_column(Float, nullable=False, default=10.0)  # 10x for verified labels
     decision_metadata: Mapped[dict[str, str]] = mapped_column(JSONB, nullable=False, default=dict)
+
+
+class GlobalModelVersion(Base):
+    """
+    Metadata for global model versions.
+    Weights are stored on the filesystem, referenced by this record.
+    """
+    __tablename__ = "global_model_versions"
+
+    version: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    precision: Mapped[float] = mapped_column(Float, nullable=False)
+    recall: Mapped[float] = mapped_column(Float, nullable=False)
+    num_gradients: Mapped[int] = mapped_column(Integer, nullable=False)
+    weights_path: Mapped[str] = mapped_column(String(512), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="superseded")  # active | superseded | rolled_back
+    chain_hash: Mapped[str] = mapped_column(String(64), nullable=False) # Integrity check for weights
+
 

@@ -6,15 +6,19 @@ This repository currently contains the implementation scaffold and project docum
 
 ## Documentation Map
 
-- [Project Documentation](docs/PROJECT_DOCUMENTATION.md) - system goals, architecture, data flow, security, and operating model.
-- [Implementation Plan](docs/implementation/IMPLEMENTATION_PLAN.md) - phase-by-phase engineering plan with coding, testing, and outside-environment tasks.
-- [Environment Setup](docs/environment/SETUP.md) - local tooling, `proctor` environment setup, services, and secrets.
-- [Testing Strategy](docs/testing/TESTING_STRATEGY.md) - unit, integration, network, privacy, performance, and validation tests.
-- [Source Document Review](docs/SOURCE_DOCUMENT_REVIEW.md) - requirements distilled from the uploaded specification, synopsis, and presentation.
-- [Repository Structure](docs/architecture/repository-structure.md) - tracked directory layout for implementation phases.
-- [Operations Log](docs/operations/OPERATIONS_LOG.md) - what was changed, why it was changed, and how it was performed.
-- [Decision Index](DECISIONS.md) - architectural decisions and ADR links.
-- [Changelog](CHANGELOG.md) - chronological project changes.
+- [Project Documentation](docs/PROJECT_DOCUMENTATION.md) - Architecture and security goals.
+- [Final Review & Compliance](docs/FINAL_REVIEW.md) - **Phase 7 acceptance report and audit findings.**
+- [Empirical Validation](docs/validation/empirical_results.md) - FPR, Precision, and rPPG accuracy reports.
+- [Performance Profile](docs/validation/PERFORMANCE_PROFILE.md) - Browser FPS and server load test results.
+- [Rate Limit Tests](docs/validation/rate_limit_tests.md) - Security hardening verification.
+- [Environment Setup](docs/environment/SETUP.md) - Local tooling and secrets.
+- [Decision Index](DECISIONS.md) - Comprehensive record of architectural decisions.
+- [Changelog](CHANGELOG.md) - Chronological project changes.
+
+## Project Status: PRODUCTION READY
+
+All implementation phases (1-7) are complete. The system has been validated for network resilience, detection accuracy, and forensic integrity.
+
 
 ## Planned Repository Areas
 

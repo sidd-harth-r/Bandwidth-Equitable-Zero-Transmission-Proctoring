@@ -24,6 +24,7 @@ class SqlAnomalyStore:
             weighted_score=event.weighted_score,
             tier=event.tier.value,
             gear=event.gear.value,
+            chain_hash=event.chain_hash,
             event_metadata=event.metadata,
         )
         self.db.add(model)
@@ -136,5 +137,6 @@ def event_to_schema(event: AnomalyEvent) -> AnomalyScoreOut:
         weighted_score=event.weighted_score,
         tier=event.tier,
         gear=event.gear,
+        chain_hash=event.chain_hash,
         metadata=event.event_metadata,
     )

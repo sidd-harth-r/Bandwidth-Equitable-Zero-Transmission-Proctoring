@@ -60,6 +60,7 @@ function processFrame(
   height: number,
   pixels: Uint8ClampedArray
 ): void {
+  const startTime = performance.now();
   const greenMean = extractGreenChannelMean(width, height, pixels);
 
   greenBuffer.push(greenMean);
@@ -77,6 +78,20 @@ function processFrame(
   const variance = computeSignalVariance(filteredBuffer, SAMPLE_RATE);
   const quality = computeSignalQuality(filteredBuffer, SAMPLE_RATE);
 
+  const done = (score: number, reason: string, isCalibrating: boolean) => {
+    const processingTimeMs = performance.now() - startTime;
+    workerScope.postMessage({
+      type: "rppg_score",
+      score,
+      reason,
+      sampledAt: new Date().toISOString(),
+      processingTimeMs,
+      heartRateEstimate: heartRate,
+      signalQuality: quality,
+      isCalibrating,
+    });
+  };
+
   if (calibrating) {
     const elapsed = calibrationStartTime ? Date.now() - calibrationStartTime : 0;
 
@@ -85,54 +100,21 @@ function processFrame(
       baselineVariance = variance;
       calibrating = false;
 
-      workerScope.postMessage({
-        type: "rppg_score",
-        score: 0,
-        reason: "calibration_complete",
-        sampledAt: new Date().toISOString(),
-        heartRateEstimate: heartRate,
-        signalQuality: quality,
-        isCalibrating: false,
-      });
+      done(0, "calibration_complete", false);
       return;
     }
 
-    workerScope.postMessage({
-      type: "rppg_score",
-      score: 0,
-      reason: `calibrating_${Math.round((elapsed / CALIBRATION_DURATION_MS) * 100)}pct`,
-      sampledAt: new Date().toISOString(),
-      heartRateEstimate: heartRate,
-      signalQuality: quality,
-      isCalibrating: true,
-    });
+    done(0, `calibrating_${Math.round((elapsed / CALIBRATION_DURATION_MS) * 100)}pct`, true);
     return;
   }
 
-  if (baselineHr === null || baselineVariance === null) {
-    workerScope.postMessage({
-      type: "rppg_score",
-      score: 0,
-      reason: "no_baseline",
-      sampledAt: new Date().toISOString(),
-      heartRateEstimate: heartRate,
-      signalQuality: quality,
-      isCalibrating: false,
-    });
+  if (baselineHr === null) {
+    done(0, "no_baseline", false);
     return;
   }
 
-  const score = computeRppgScore(heartRate, variance, baselineHr, baselineVariance);
-
-  workerScope.postMessage({
-    type: "rppg_score",
-    score,
-    reason: quality > 0.3 ? "rppg_active" : "rppg_low_quality",
-    sampledAt: new Date().toISOString(),
-    heartRateEstimate: heartRate,
-    signalQuality: quality,
-    isCalibrating: false,
-  });
+  const score = computeRppgScore(heartRate, variance, baselineHr, baselineVariance!);
+  done(score, "rppg_active", false);
 }
 
 /* ── Worker message handler ───────────────────────────────── */

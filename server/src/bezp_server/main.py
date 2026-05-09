@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from redis import Redis
 
 from bezp_server.api.routes import (
-    anomaly_scores, clips, federated, health, interventions,
+    anomaly_scores, clips, exports, federated, health, interventions,
     reviews, session_history, session_state, signaling,
 )
 from bezp_server.config import get_settings
@@ -50,6 +50,7 @@ def create_app() -> FastAPI:
     app.include_router(reviews.router, prefix=settings.api_prefix)
     app.include_router(interventions.router, prefix=settings.api_prefix)
     app.include_router(federated.router, prefix=settings.api_prefix)
+    app.include_router(exports.router, prefix=settings.api_prefix)
 
     return app
 

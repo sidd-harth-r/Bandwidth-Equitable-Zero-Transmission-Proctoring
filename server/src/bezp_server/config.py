@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     session_state_read_rate_limit_window_seconds: int = 60
     session_heartbeat_rate_limit_count: int = 180
     session_heartbeat_rate_limit_window_seconds: int = 60
+    admin_api_key: str = Field(default="dev_admin_key", alias="BEZP_ADMIN_API_KEY")
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
