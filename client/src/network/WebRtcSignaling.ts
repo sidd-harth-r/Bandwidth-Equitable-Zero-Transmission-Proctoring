@@ -1,5 +1,6 @@
 import type { SignalEnvelope } from "./SignalingClient";
 import type { AnomalyScorePayload } from "../coordinator/types";
+import { TelemetryCollector } from "./TelemetryCollector";
 
 export interface DataChannelLike {
   readyState: "connecting" | "open" | "closing" | "closed";
@@ -8,11 +9,13 @@ export interface DataChannelLike {
 
 export interface PeerConnectionLike {
   localDescription: RTCSessionDescription | null;
+  connectionState: RTCPeerConnectionState;
   createOffer(): Promise<RTCSessionDescriptionInit>;
   setLocalDescription(description: RTCSessionDescriptionInit): Promise<void>;
   setRemoteDescription(description: RTCSessionDescriptionInit): Promise<void>;
   addIceCandidate(candidate: RTCIceCandidateInit): Promise<void>;
   createDataChannel(label: string, options?: RTCDataChannelInit): DataChannelLike;
+  getStats(selector?: MediaStreamTrack | null): Promise<RTCStatsReport>;
   close(): void;
   onicecandidate: ((event: RTCPeerConnectionIceEvent) => void) | null;
 }
@@ -20,6 +23,7 @@ export interface PeerConnectionLike {
 export interface WebRtcSession {
   peer: PeerConnectionLike;
   dataChannel: DataChannelLike;
+  telemetry: TelemetryCollector;
   waitForAnswer: Promise<boolean>;
   diagnostics: {
     localIceCandidates: number;
@@ -66,6 +70,9 @@ export async function startWebRtcSignaling(
     maxRetransmits: 0
   });
 
+  const telemetry = new TelemetryCollector(peer);
+  telemetry.start();
+
   peer.onicecandidate = (event) => {
     if (!event.candidate) {
       return;
@@ -99,6 +106,7 @@ export async function startWebRtcSignaling(
   return {
     peer,
     dataChannel,
+    telemetry,
     waitForAnswer: waitForAnswer(signaling, ids, peer, diagnostics),
     diagnostics
   };

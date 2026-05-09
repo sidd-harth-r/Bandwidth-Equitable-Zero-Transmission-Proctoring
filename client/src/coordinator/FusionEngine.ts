@@ -34,19 +34,38 @@ export class FusionEngine {
     return { ...this.weights };
   }
 
+  private activeChannels: Record<string, boolean> = {
+    pose_gaze: true,
+    rppg: true,
+    au: true,
+    keystroke: true
+  };
+
+  /**
+   * Update active channels (e.g. from gear transition).
+   */
+  updateActiveChannels(active: Record<string, boolean>): void {
+    Object.assign(this.activeChannels, active);
+  }
+
   fuse(channelScores: ChannelScores): FusionResult {
-    const scores = CHANNEL_KEYS.map((key) => clamp01(channelScores[key]));
-    const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+    const activeKeys = CHANNEL_KEYS.filter(key => this.activeChannels[key] !== false);
+    const numActive = activeKeys.length || 1;
+
+    const scores = activeKeys.map((key) => clamp01(channelScores[key]));
+    const mean = scores.reduce((sum, score) => sum + score, 0) / numActive;
+    
+    // Variance computation: stddev of 2 is less informative, but we compute it normally
     const variance =
-      scores.reduce((sum, score) => sum + Math.pow(score - mean, 2), 0) / scores.length;
+      scores.reduce((sum, score) => sum + Math.pow(score - mean, 2), 0) / numActive;
 
     // Channel Agreement Index — lower variance = higher agreement
     const agreementIndex = Math.min(0.5, Math.sqrt(variance));
 
     // Weighted score using configured weights
-    const totalWeight = CHANNEL_KEYS.reduce((sum, key) => sum + this.weights[key], 0) || 1;
+    const totalWeight = activeKeys.reduce((sum, key) => sum + this.weights[key], 0) || 1;
     const weightedScore =
-      CHANNEL_KEYS.reduce(
+      activeKeys.reduce(
         (sum, key) => sum + clamp01(channelScores[key]) * this.weights[key],
         0
       ) / totalWeight;

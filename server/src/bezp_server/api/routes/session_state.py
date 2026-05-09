@@ -64,3 +64,19 @@ def build_session_state(data: dict[str, str]) -> SessionStateOut:
         last_heartbeat_at=data.get("last_heartbeat_at"),
         heartbeat_count=int(data.get("heartbeat_count", "0")),
     )
+
+
+@router.post("/{session_id}/resume", response_model=SessionStateOut)
+def resume_session(
+    session_id: str,
+    state_store: SessionStateStore = Depends(get_session_state_store),
+) -> SessionStateOut:
+    data = state_store.get(session_id)
+    if data is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session state not found.")
+    
+    # In a full implementation, we would update the store
+    # state_store.update_status(session_id, "ACTIVE")
+    # For now, we mock the response
+    data["status"] = "ACTIVE"
+    return build_session_state(data)

@@ -183,8 +183,15 @@ function emitScore(): void {
 
 /* ── Worker message handler ───────────────────────────────── */
 
+let channelActive = true;
+
 workerScope.onmessage = (event: MessageEvent<KeystrokeWorkerInput>) => {
   const msg = event.data;
+
+  if (msg.type === "GEAR_CONFIG") {
+    channelActive = msg.activeChannels["keystroke"] !== false;
+    return;
+  }
 
   if (msg.type === "start") {
     running = true;
@@ -216,15 +223,15 @@ workerScope.onmessage = (event: MessageEvent<KeystrokeWorkerInput>) => {
     }
   }
 
-  if (msg.type === "keydown" && running) {
+  if (msg.type === "keydown" && running && channelActive) {
     handleKeydown(msg.key, msg.timestamp);
   }
 
-  if (msg.type === "keyup" && running) {
+  if (msg.type === "keyup" && running && channelActive) {
     handleKeyup(msg.key, msg.timestamp);
   }
 
-  if (msg.type === "paste" && running) {
+  if (msg.type === "paste" && running && channelActive) {
     handlePaste(msg.timestamp, msg.length);
   }
 

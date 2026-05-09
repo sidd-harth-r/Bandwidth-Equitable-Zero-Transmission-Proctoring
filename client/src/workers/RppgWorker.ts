@@ -137,8 +137,18 @@ function processFrame(
 
 /* ── Worker message handler ───────────────────────────────── */
 
+let targetFps = 10;
+let channelActive = true;
+let lastFrameTime = 0;
+
 workerScope.onmessage = (event: MessageEvent<RppgWorkerInput>) => {
   const msg = event.data;
+
+  if (msg.type === "GEAR_CONFIG") {
+    targetFps = msg.targetFps;
+    channelActive = msg.activeChannels["rppg"] !== false;
+    return;
+  }
 
   if (msg.type === "start") {
     running = true;
@@ -156,6 +166,10 @@ workerScope.onmessage = (event: MessageEvent<RppgWorkerInput>) => {
   }
 
   if (msg.type === "frame" && running) {
+    if (!channelActive) return;
+    const now = Date.now();
+    if (now - lastFrameTime < 1000 / targetFps) return;
+    lastFrameTime = now;
     processFrame(msg.width, msg.height, msg.pixels);
   }
 

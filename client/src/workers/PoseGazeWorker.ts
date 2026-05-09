@@ -1,4 +1,4 @@
-import type { WorkerScoreMessage } from "../coordinator/types";
+import type { WorkerScoreMessage, GearConfigMessage } from "../coordinator/types";
 import type {
   NormalizedLandmarkList,
   Options as MediaPipePoseOptions,
@@ -8,6 +8,11 @@ import type {
 let intervalId: ReturnType<typeof setInterval> | undefined;
 let previousCenter: { x: number; y: number } | undefined;
 let previousBrightness = 0.5;
+
+let targetFps = 10;
+let channelActive = true;
+let lastFrameTime = 0;
+
 type MediaPipePoseApi = {
   send(input: { image: ImageData }): Promise<void>;
   setOptions(options: MediaPipePoseOptions): void;
@@ -29,9 +34,16 @@ const workerScope = self as unknown as {
 type WorkerInputMessage =
   | { type: "start" }
   | { type: "stop" }
-  | { type: "frame"; width: number; height: number; pixels: Uint8ClampedArray };
+  | { type: "frame"; width: number; height: number; pixels: Uint8ClampedArray }
+  | GearConfigMessage;
 
 workerScope.onmessage = (event: MessageEvent<WorkerInputMessage>) => {
+  if (event.data.type === "GEAR_CONFIG") {
+    targetFps = event.data.targetFps;
+    channelActive = event.data.activeChannels["pose_gaze"] !== false;
+    return;
+  }
+
   if (event.data.type === "start" && intervalId === undefined) {
     previousCenter = undefined;
     void ensurePoseDetector();
@@ -47,6 +59,10 @@ workerScope.onmessage = (event: MessageEvent<WorkerInputMessage>) => {
   }
 
   if (event.data.type === "frame") {
+    if (!channelActive) return;
+    const now = Date.now();
+    if (now - lastFrameTime < 1000 / targetFps) return;
+    lastFrameTime = now;
     void processFrame(event.data);
   }
 

@@ -8,6 +8,14 @@ export interface ChannelScores {
   keystroke: number;
 }
 
+export interface GearConfigMessage {
+  type: "GEAR_CONFIG";
+  gear: Gear;
+  targetFps: number;
+  activeChannels: Record<string, boolean>;
+  useQuantization: boolean;
+}
+
 /* ── Pose / Gaze ─────────────────────────────────────────────── */
 
 export interface WorkerScoreMessage {
@@ -45,7 +53,8 @@ export type RppgWorkerInput =
   | { type: "start" }
   | { type: "stop" }
   | { type: "frame"; width: number; height: number; pixels: Uint8ClampedArray }
-  | { type: "set_baseline"; baselineHr: number; baselineVariance: number };
+  | { type: "set_baseline"; baselineHr: number; baselineVariance: number }
+  | GearConfigMessage;
 
 /* ── Action Units ────────────────────────────────────────────── */
 
@@ -72,7 +81,8 @@ export type AuWorkerInput =
   | { type: "start" }
   | { type: "stop" }
   | { type: "frame"; width: number; height: number; pixels: Uint8ClampedArray }
-  | { type: "set_baseline"; baseline: AuActivation };
+  | { type: "set_baseline"; baseline: AuActivation }
+  | GearConfigMessage;
 
 /* ── Keystroke ────────────────────────────────────────────────── */
 
@@ -101,7 +111,8 @@ export type KeystrokeWorkerInput =
   | { type: "keyup"; key: string; timestamp: number }
   | { type: "paste"; timestamp: number; length: number }
   | { type: "set_baseline"; baseline: KeystrokeFeatures }
-  | { type: "flush" };
+  | { type: "flush" }
+  | GearConfigMessage;
 
 /* ── Audio ────────────────────────────────────────────────────── */
 
