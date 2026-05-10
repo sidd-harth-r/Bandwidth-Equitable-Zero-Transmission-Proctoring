@@ -1,8 +1,8 @@
 {
   "fpr": 0.0,
   "precision": 1.0,
-  "recall": 1.0,
+  "recall": 0.4875,
   "legitimate_alerts": 0,
-  "cheating_alerts": 7819,
+  "cheating_alerts": 1024,
   "total_legitimate_timesteps": 30000
 }

@@ -73,27 +73,46 @@ class TierClassifier:
         return "tier_3"
 
 def generate_mock_data(filename):
-    """Generate mock validation data if h5 file is missing."""
+    """Generate mock validation data with the specific Phase 7 breakdown."""
     with h5py.File(filename, "w") as f:
-        # Legitimate sequences (50 sequences, 600 timesteps)
+        # 1. Legitimate sequences (50)
         legit = f.create_group("legitimate")
         for i in range(50):
-            # Normal distribution around 0.1-0.2
             data = np.random.normal(0.15, 0.05, (600, 4))
-            legit.create_dataset(f"seq_{i}", data=np.clip(data, 0, 1))
+            legit.create_dataset(f"legit_{i}", data=np.clip(data, 0, 1))
             
-        # Cheating sequences (80 sequences, 600 timesteps)
+        # 2. Cheating sequences (80 total)
         cheating = f.create_group("cheating")
-        for i in range(80):
-            # Normal distribution around 0.1, but with a "cheating" burst
-            data = np.random.normal(0.1, 0.05, (600, 4))
-            # Burst of high scores in some channels
-            start = np.random.randint(100, 400)
-            length = np.random.randint(50, 150)
-            # High scores in pose_gaze and au (index 0 and 2)
-            data[start:start+length, 0] = np.random.normal(0.9, 0.05, length)
-            data[start:start+length, 2] = np.random.normal(0.8, 0.1, length)
-            cheating.create_dataset(f"seq_{i}", data=np.clip(data, 0, 1))
+        
+        # 2a. Coached-answer (30): Elevated AU and rPPG
+        for i in range(30):
+            data = np.random.normal(0.15, 0.05, (600, 4))
+            start, length = np.random.randint(100, 400), np.random.randint(50, 150)
+            data[start:start+length, 1] = np.random.normal(0.85, 0.05, length) # rPPG stress
+            data[start:start+length, 2] = np.random.normal(0.8, 0.05, length) # AU stress
+            cheating.create_dataset(f"coached_{i}", data=np.clip(data, 0, 1))
+            
+        # 2b. Copy-paste (20): Zero corrections, burst typing
+        for i in range(20):
+            data = np.random.normal(0.15, 0.05, (600, 4))
+            start, length = np.random.randint(100, 400), np.random.randint(20, 80)
+            data[start:start+length, 3] = np.random.normal(0.95, 0.02, length) # Keystroke burst
+            cheating.create_dataset(f"copypaste_{i}", data=np.clip(data, 0, 1))
+            
+        # 2c. Phone-glance (20): Off-axis gaze
+        for i in range(20):
+            data = np.random.normal(0.15, 0.05, (600, 4))
+            start, length = np.random.randint(100, 400), np.random.randint(30, 100)
+            data[start:start+length, 0] = np.random.normal(0.95, 0.02, length) # Gaze shift
+            cheating.create_dataset(f"phone_{i}", data=np.clip(data, 0, 1))
+            
+        # 2d. Second-speaker (10): Audio anomaly (mapped to AU/Gaze proxy)
+        for i in range(10):
+            data = np.random.normal(0.15, 0.05, (600, 4))
+            start, length = np.random.randint(100, 400), np.random.randint(50, 150)
+            data[start:start+length, 0] = np.random.normal(0.8, 0.1, length) # Gaze deviation
+            data[start:start+length, 2] = np.random.normal(0.85, 0.05, length) # AU activation (speech)
+            cheating.create_dataset(f"speaker_{i}", data=np.clip(data, 0, 1))
 
 def run_validation(filename):
     fusion_engine = FusionEngine()

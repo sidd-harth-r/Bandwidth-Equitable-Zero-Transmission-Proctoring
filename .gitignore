@@ -6,7 +6,7 @@
 venv/
 env/
 proctor/
-
+data/raw/
 # Python
 __pycache__/
 *.py[cod]
